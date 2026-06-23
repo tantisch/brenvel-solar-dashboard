@@ -91,12 +91,12 @@ const DATA = __DATA__;
 const S = DATA.stations;
 const ST = {connected:['#16a34a','Онлайн'],disconnected:['#94a3b8','Офлайн'],
   trouble:['#f59e0b','Попередження'],unknown:['#94a3b8','Невідомо']};
-const CO2 = 0.45;
 const COLORS = ['#16a34a','#2563eb','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899'];
 const fmt = (n,d=0)=> (n==null||isNaN(n))?'–':Number(n).toLocaleString('uk-UA',{minimumFractionDigits:d,maximumFractionDigits:d});
 const short = n => n.replace('Brenvel_','').replace('Brenvei_','');
 const stCol = s => (ST[s]||ST.unknown)[0];
 const stLbl = s => (ST[s]||ST.unknown)[1];
+const cap = s => s.nominal_kw>0 ? fmt(s.nominal_kw)+' кВт' : '—';
 let charts = [];
 function clearCharts(){ charts.forEach(c=>c.destroy()); charts=[]; }
 function kpi(k,v,u,s){ return `<div class="kpi"><div class="k">${k}</div>
@@ -152,7 +152,6 @@ function overview(){
       ${kpi('Цей місяць',fmt(month),'кВт·год')}
       ${kpi('Цей рік',fmt(year),'кВт·год')}
       ${kpi('За весь час',fmt(life/1000,1),'МВт·год')}
-      ${kpi('CO₂ заощаджено',fmt(life*CO2/1000),'т','за весь час')}
       ${kpi('Станцій онлайн',online+' / '+S.length,'', online<S.length?'⚠ '+(S.length-online)+' потребують уваги':'усі справні')}
     </div>
     ${probs.length?`<div class="alert">⚠️ <b>Потребують уваги (${probs.length}):</b> ${probs.map(p=>short(p.name)+' ('+stLbl(p.status).toLowerCase()+')').join(', ')}</div>`:''}
@@ -173,7 +172,7 @@ function overview(){
 function scard(s,i){
   const c=stCol(s.status);
   return `<div class="scard" style="border-top-color:${c}" onclick="go(${i})">
-    <div class="top"><div class="nm">${s.name}</div><div class="badge" style="background:${c}">${stLbl(s.status)}</div></div>
+    <div class="top"><div class="nm">${s.name} <span style="color:#94a3b8;font-weight:600;font-size:12.5px">· ${cap(s)}</span></div><div class="badge" style="background:${c}">${stLbl(s.status)}</div></div>
     <div class="now">${fmt(s.now_kw,1)}<u> кВт зараз</u></div>
     <div class="mini">
       <div><div class="l">Сьогодні</div><div class="x">${fmt(s.today_kwh)}</div></div>
@@ -193,7 +192,7 @@ function station(i){
   v.innerHTML=`
     <div class="dhead">
       <div>
-        <div class="h1"><span style="width:13px;height:13px;border-radius:50%;background:${c};display:inline-block"></span>${s.name}</div>
+        <div class="h1"><span style="width:13px;height:13px;border-radius:50%;background:${c};display:inline-block"></span>${s.name} <span style="font-size:16px;color:#94a3b8;font-weight:600">· ${cap(s)} встановлено</span></div>
         <div class="addr">📍 ${s.address||'—'}</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -210,7 +209,6 @@ function station(i){
       ${kpi('Цей місяць',fmt(s.month_kwh),'кВт·год')}
       ${kpi('Цей рік',fmt(s.year_kwh),'кВт·год')}
       ${kpi('За весь час',fmt(s.total_kwh/1000,1),'МВт·год')}
-      ${kpi('CO₂ за весь час',fmt(s.total_kwh*CO2/1000),'т')}
     </div>
     <div class="charts">
       <div class="panel full"><h3>Потужність сьогодні</h3><div class="sub">кВт · крок 5 хв · показано весь день, прогалини — немає даних</div>

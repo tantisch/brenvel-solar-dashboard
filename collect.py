@@ -12,6 +12,14 @@ from fusionsolar import FusionSolarClient
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
+# Manual override of installed capacity (kW) per station name. FusionSolar
+# reports 0 for a site while it's offline (and the installer never set a fixed
+# installedCapacity), so put known values here. Anything not listed falls back
+# to FusionSolar's reported inverter capacity.
+CAPACITY_KW = {
+    # "Brenvei_K.K_navis": 150,   # offline — set its real installed kW here
+}
+
 TZ = timezone(timedelta(hours=3))   # Ukraine (EEST)
 def _ms(dt): return int(dt.timestamp() * 1000)
 def _num(v, d=0.0):
@@ -47,7 +55,7 @@ def collect():
             rec = {
                 "name": name, "dn": dn, "region": region.region_code,
                 "status": st.get("plantStatus") or "unknown",
-                "nominal_kw": _num(st.get("onlyInverterPower")),
+                "nominal_kw": CAPACITY_KW.get(name) or _num(st.get("onlyInverterPower")),
                 "now_kw": _num(st.get("currentPower")),
                 "today_kwh": _num(st.get("dailyEnergy")),
                 "month_kwh": _num(st.get("monthEnergy")),
