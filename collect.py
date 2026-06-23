@@ -70,17 +70,29 @@ def collect():
             # keep only true inverters (exclude meters / power sensors, whose
             # 30014 signal is grid power and would corrupt the generation curve)
             devices = _safe(region.get_inverters, dn)
-            rec["inverters"] = [d for d in devices
-                                if "inverter" in ((d.get("type") or "") + " " + (d.get("name") or "")).lower()]
-            inv_dns = [i["dn"] for i in rec["inverters"] if i.get("dn")]
-            rec["today_curve"] = _safe(region.get_power_curve, inv_dns); time.sleep(0.4)
+            inverters = [d for d in devices
+                         if "inverter" in ((d.get("type") or "") + " " + (d.get("name") or "")).lower()]
+            # per-inverter real-time signals + power curve; sum curves -> station curve
+            agg = {}
+            for inv in inverters:
+                idn = inv.get("dn")
+                inv["rt"] = _safe(region.get_inverter_realtime, idn, default={}); time.sleep(0.3)
+                inv["curve"] = _safe(region.get_inverter_curve, idn); time.sleep(0.3)
+                for p in inv["curve"]:
+                    a = agg.setdefault(p["t"], {"sum": 0.0, "has": False})
+                    if p["kw"] is not None:
+                        a["sum"] += p["kw"]; a["has"] = True
+            rec["inverters"] = inverters
+            rec["today_curve"] = [{"t": t, "kw": round(agg[t]["sum"], 2) if agg[t]["has"] else None}
+                                  for t in sorted(agg)]
             rec["daily"] = _safe(region.get_history, dn, 4, t_daily, t_now); time.sleep(0.5)
             rec["monthly"] = _safe(region.get_history, dn, 5, t_monthly, t_now); time.sleep(0.5)
             rec["yearly"] = _safe(region.get_history, dn, 6, t_yearly, t_now); time.sleep(0.5)
             rec["alarms"] = _safe(region.get_alarms, dn)
             print(f"     curve={len(rec['today_curve'])} daily={len(rec['daily'])} "
                   f"monthly={len(rec['monthly'])} yearly={len(rec['yearly'])} "
-                  f"inv={len(rec['inverters'])} alarms={len(rec['alarms'])}")
+                  f"inv={len(rec['inverters'])} rt={sum(1 for i in inverters if i.get('rt'))} "
+                  f"alarms={len(rec['alarms'])}")
             stations.append(rec)
             time.sleep(0.6)
 

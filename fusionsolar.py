@@ -114,37 +114,50 @@ class RegionSession:
     # -- rich per-station data -----------------------------------------------
     _NODATA = 1.0e308   # FusionSolar's "no value" sentinel (1.7976931348623157e308)
 
-    def get_power_curve(self, inverter_dns: list) -> list:
-        """Today's intraday PV power curve (kW), summed across a station's
-        INVERTERS only (pass inverter DNs — never meters/sensors, whose 30014
-        signal is grid power, not generation).
+    # real-time inverter signal ids -> friendly keys
+    _RT_SIGNALS = {
+        10025: "status", 10032: "daily_kwh", 10029: "total_kwh", 10018: "power",
+        10019: "reactive", 10006: "rated", 10020: "pf", 10021: "freq",
+        10014: "i_a", 10015: "i_b", 10016: "i_c", 10011: "v_a", 10012: "v_b",
+        10013: "v_c", 10023: "temp", 10024: "insulation", 10027: "startup",
+        10028: "shutdown", 21029: "out_mode",
+    }
 
-        Returns the full-day 5-minute timeline [{t:'HH:MM', kw:float|None}].
-        Slots with no inverter telemetry (night gaps, future) are None so the
-        chart leaves them blank rather than inventing a value."""
-        grid = {}   # startTime -> {"sum":kW, "has":bool, "off":seconds}
-        for dn in inverter_dns:
-            r = self._request(
-                "GET", "/rest/pvms/web/device/v1/device-history-data",
-                params=[("signalIds", "30014"), ("deviceDn", dn),
-                        ("date", _now_ms()), ("_", _now_ms())],
-            )
-            node = (r.json().get("data", {}) or {}).get("30014", {}) or {}
-            for p in node.get("pmDataList", []) or []:
-                st = p.get("startTime")
-                if st is None:
-                    continue
-                g = grid.setdefault(st, {"sum": 0.0, "has": False,
-                    "off": (p.get("timeZoneOffset", 0) + p.get("dstOffset", 0)) * 60})
-                v = p.get("counterValue")
-                if v is not None and float(v) < self._NODATA:
-                    g["sum"] += float(v)
-                    g["has"] = True
+    def get_inverter_curve(self, inverter_dn: str) -> list:
+        """One inverter's full-day 5-minute power curve [{t:'HH:MM', kw:float|None}].
+        None where the inverter had no telemetry (night gaps, future)."""
+        r = self._request(
+            "GET", "/rest/pvms/web/device/v1/device-history-data",
+            params=[("signalIds", "30014"), ("deviceDn", inverter_dn),
+                    ("date", _now_ms()), ("_", _now_ms())],
+        )
+        node = (r.json().get("data", {}) or {}).get("30014", {}) or {}
         out = []
-        for st in sorted(grid):
-            g = grid[st]
-            hhmm = time.strftime("%H:%M", time.gmtime(st + g["off"]))
-            out.append({"t": hhmm, "kw": round(g["sum"], 2) if g["has"] else None})
+        for p in node.get("pmDataList", []) or []:
+            st = p.get("startTime")
+            if st is None:
+                continue
+            off = (p.get("timeZoneOffset", 0) + p.get("dstOffset", 0)) * 60
+            v = p.get("counterValue")
+            kw = round(float(v), 2) if (v is not None and float(v) < self._NODATA) else None
+            out.append({"t": time.strftime("%H:%M", time.gmtime(st + off)), "kw": kw})
+        return out
+
+    def get_inverter_realtime(self, inverter_dn: str) -> dict:
+        """Current real-time signals for one inverter -> {key: {"v":value,"u":unit}}."""
+        r = self._request(
+            "GET", "/rest/pvms/web/device/v1/device-realtime-data",
+            params={"deviceDn": inverter_dn, "_": _now_ms()},
+        )
+        out = {}
+        for grp in (r.json().get("data") or []):
+            for sig in (grp.get("signals") or []):
+                try:
+                    key = self._RT_SIGNALS.get(int(sig.get("id")))
+                except (TypeError, ValueError):
+                    key = None
+                if key:
+                    out[key] = {"v": sig.get("value"), "u": sig.get("unit", "") or ""}
         return out
 
     def get_history(self, station_dn: str, stat_dim: int, t0_ms: int, t1_ms: int) -> list:

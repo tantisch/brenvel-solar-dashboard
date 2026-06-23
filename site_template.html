@@ -68,6 +68,11 @@
   th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);font-weight:700}
   td.r,th.r{text-align:right}
   .ok{color:var(--green);font-weight:700}
+  .invcard{background:#f8fafc}
+  .invhead{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700}
+  .ibadge{font-size:11px;font-weight:700;color:#fff;padding:3px 10px;border-radius:999px}
+  .invphase{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:7px 22px;font-size:13px;color:#475569;margin-top:8px}
+  .invphase .pl{color:#94a3b8;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;margin-right:5px}
   .foot{text-align:center;color:var(--faint);font-size:12px;margin-top:34px}
   @media(max-width:640px){.wrap{padding:0 16px 40px}.bar{padding:12px 16px}.charts{grid-template-columns:1fr}
     .cwrap{height:260px}}
@@ -142,6 +147,7 @@ function overview(){
   const now=S.reduce((a,s)=>a+s.now_kw,0), today=S.reduce((a,s)=>a+s.today_kwh,0);
   const month=S.reduce((a,s)=>a+s.month_kwh,0), year=S.reduce((a,s)=>a+s.year_kwh,0);
   const life=S.reduce((a,s)=>a+s.total_kwh,0), rev=S.reduce((a,s)=>a+(s.today_rev||0),0);
+  const totRev=S.reduce((a,s)=>a+(s.yearly||[]).reduce((b,y)=>b+(y.rev||0),0),0);
   const online=S.filter(s=>s.status==='connected').length;
   const probs=S.filter(s=>s.status!=='connected');
   const v=document.getElementById('view');
@@ -152,6 +158,7 @@ function overview(){
       ${kpi('Цей місяць',fmt(month),'кВт·год')}
       ${kpi('Цей рік',fmt(year),'кВт·год')}
       ${kpi('За весь час',fmt(life/1000,1),'МВт·год')}
+      ${kpi('Загальний дохід','€'+fmt(totRev),'','за весь час')}
       ${kpi('Станцій онлайн',online+' / '+S.length,'', online<S.length?'⚠ '+(S.length-online)+' потребують уваги':'усі справні')}
     </div>
     ${probs.length?`<div class="alert">⚠️ <b>Потребують уваги (${probs.length}):</b> ${probs.map(p=>short(p.name)+' ('+stLbl(p.status).toLowerCase()+')').join(', ')}</div>`:''}
@@ -205,10 +212,12 @@ function station(i){
     <div class="kpis">
       ${kpi('Потужність зараз',fmt(s.now_kw,1),'кВт')}
       ${kpi('Пік сьогодні',fmt(peak,1),'кВт')}
-      ${kpi('Енергія сьогодні',fmt(s.today_kwh),'кВт·год','€'+fmt(s.today_rev))}
+      ${kpi('Енергія сьогодні',fmt(s.today_kwh),'кВт·год','€'+fmt(s.today_rev)+' дохід')}
+      ${kpi('Питома продуктивність',s.nominal_kw>0?fmt(s.today_kwh/s.nominal_kw,2):'—','кВт·год/кВт','сьогодні')}
       ${kpi('Цей місяць',fmt(s.month_kwh),'кВт·год')}
       ${kpi('Цей рік',fmt(s.year_kwh),'кВт·год')}
       ${kpi('За весь час',fmt(s.total_kwh/1000,1),'МВт·год')}
+      ${kpi('Загальний дохід','€'+fmt((s.yearly||[]).reduce((a,y)=>a+(y.rev||0),0)),'','за весь час')}
     </div>
     <div class="charts">
       <div class="panel full"><h3>Потужність сьогодні</h3><div class="sub">кВт · крок 5 хв · показано весь день, прогалини — немає даних</div>
@@ -217,28 +226,58 @@ function station(i){
         <div class="cwrap"><canvas id="dDaily"></canvas></div></div>
       <div class="panel"><h3>Місячний виробіток</h3><div class="sub">кВт·год</div>
         <div class="cwrap"><canvas id="dMonthly"></canvas></div></div>
+      <div class="panel"><h3>Дохід по місяцях</h3><div class="sub">€ на місяць</div>
+        <div class="cwrap"><canvas id="dRev"></canvas></div></div>
       <div class="panel"><h3>Річний виробіток</h3><div class="sub">кВт·год</div>
         <div class="cwrap"><canvas id="dYearly"></canvas></div></div>
-      <div class="panel"><h3>Інвертори та аварії</h3><div class="sub">Інверторів: ${s.inverters.length}</div>
-        ${invTable(s)}</div>
-    </div>`;
+      <div class="panel"><h3>Аварії</h3><div class="sub">поточний стан</div>${alarmsHtml(s)}</div>
+    </div>
+    <h2 class="sec">Інвертори (${s.inverters.length}) — детально</h2>
+    ${s.inverters.map((inv,k)=>invCard(inv,k)).join('') || '<div class="panel">Немає інверторів</div>'}`;
   if(s.today_curve.some(p=>p.kw!=null)) lineChart('dCurve',s.today_curve.map(p=>p.t),s.today_curve.map(p=>p.kw),c);
   else noData('dCurve','Немає даних за сьогодні (станція офлайн)');
   barChart('dDaily',daily.map(d=>d.label.slice(5)),daily.map(d=>d.kwh),'#16a34a');
   barChart('dMonthly',monthly.map(d=>d.label),monthly.map(d=>d.kwh),'#2563eb');
+  barChart('dRev',monthly.map(d=>d.label),monthly.map(d=>d.rev),'#0ea5e9','€');
   barChart('dYearly',yearly.map(d=>d.label),yearly.map(d=>d.kwh),'#8b5cf6');
+  s.inverters.forEach((inv,k)=>{
+    if((inv.curve||[]).some(p=>p.kw!=null)) lineChart('inv'+k,inv.curve.map(p=>p.t),inv.curve.map(p=>p.kw),invColor(inv));
+    else noData('inv'+k,'Немає даних за сьогодні');
+  });
 }
-function invTable(s){
-  let h=`<table><tr><th>Інвертор</th><th>Тип</th><th class="r">Статус</th></tr>`+
-    s.inverters.map(d=>`<tr><td>${d.name||d.dn}</td><td>${d.type||'—'}</td>
-      <td class="r">${s.status==='connected'?'<span class="ok">● працює</span>':'—'}</td></tr>`).join('')+`</table>`;
-  if(s.alarms.length){
-    h+=`<div style="margin-top:14px"><div class="sub" style="color:#92400e">Активні аварії</div>`+
-      s.alarms.map(a=>`<div class="alert" style="margin:0 0 8px">⚠️ <b>${a.name}</b>${a.device?' — '+a.device:''}</div>`).join('')+`</div>`;
-  } else {
-    h+=`<div style="margin-top:12px" class="ok">✓ Немає активних аварій</div>`;
-  }
-  return h;
+const rtv=(rt,k)=>{const x=rt&&rt[k]&&rt[k].v; return (x==null||x==='-'||x==='')?'—':x;};
+function rtnum(rt,k,d=1){const x=rt&&rt[k]&&rt[k].v,n=parseFloat(x); return (x==null||x==='-'||isNaN(n))?'—':fmt(n,d);}
+function invColor(inv){const st=(inv.rt&&inv.rt.status&&inv.rt.status.v)||'';
+  if(/limit/i.test(st)) return '#f59e0b';
+  if(/connect/i.test(st)) return '#16a34a';
+  return '#94a3b8';}
+function invCard(inv,k){
+  const rt=inv.rt||{}, col=invColor(inv);
+  return `<div class="panel invcard" style="border-left:4px solid ${col};border-radius:0 16px 16px 0;margin-bottom:14px">
+    <div class="invhead">${inv.name||inv.dn}<span class="ibadge" style="background:${col}">${rtv(rt,'status')}</span></div>
+    <div class="kpis" style="margin:14px 0 4px">
+      ${kpi('Активна потужність',rtnum(rt,'power',1),'кВт','з '+rtnum(rt,'rated',0)+' кВт')}
+      ${kpi('Енергія сьогодні',rtnum(rt,'daily_kwh',1),'кВт·год')}
+      ${kpi('Всього вироблено',rtnum(rt,'total_kwh',0),'кВт·год')}
+      ${kpi('Температура',rtnum(rt,'temp',1),'°C')}
+      ${kpi('Коеф. потужності',rtnum(rt,'pf',2),'')}
+      ${kpi('Частота',rtnum(rt,'freq',2),'Гц')}
+    </div>
+    <div class="invphase">
+      <div><span class="pl">Напруга</span> A ${rtnum(rt,'v_a',1)} · B ${rtnum(rt,'v_b',1)} · C ${rtnum(rt,'v_c',1)} В</div>
+      <div><span class="pl">Струм</span> A ${rtnum(rt,'i_a',1)} · B ${rtnum(rt,'i_b',1)} · C ${rtnum(rt,'i_c',1)} А</div>
+      <div><span class="pl">Реактивна</span> ${rtnum(rt,'reactive',2)} квар</div>
+      <div><span class="pl">Ізоляція</span> ${rtnum(rt,'insulation',2)} МОм</div>
+      <div><span class="pl">Режим</span> ${rtv(rt,'out_mode')}</div>
+      <div><span class="pl">Запуск</span> ${rtv(rt,'startup')}</div>
+    </div>
+    <div class="cwrap" style="height:200px;margin-top:14px"><canvas id="inv${k}"></canvas></div>
+  </div>`;
+}
+function alarmsHtml(s){
+  if(s.alarms&&s.alarms.length) return s.alarms.map(a=>
+    `<div class="alert" style="margin:8px 0 0">⚠️ <b>${a.name}</b>${a.device?' — '+a.device:''}</div>`).join('');
+  return `<div class="ok" style="margin-top:8px">✓ Немає активних аварій</div>`;
 }
 function noData(id,msg){
   const c=document.getElementById(id); if(c)c.parentElement.innerHTML=`<div style="display:flex;height:100%;align-items:center;justify-content:center;color:#94a3b8;font-size:14px">${msg}</div>`;
