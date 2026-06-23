@@ -1,6 +1,8 @@
 """
-Collect the full rich dataset for every station (both regions) and write
-output/data.json. Used by build_dashboard.py; can also be run standalone.
+Collect the full energy dataset for every station (both regions) and write
+output/data.json: live snapshot, today's energy balance, PV power curve, and
+daily/monthly/yearly history of PV / load / grid import & export / self-use /
+revenue (metered sites) — plus tariff and alarms.
 """
 import os
 import json
@@ -12,12 +14,10 @@ from fusionsolar import FusionSolarClient
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
-# Manual override of installed capacity (kW) per station name. FusionSolar
-# reports 0 for a site while it's offline (and the installer never set a fixed
-# installedCapacity), so put known values here. Anything not listed falls back
-# to FusionSolar's reported inverter capacity.
+# Manual override of installed capacity (kW) per station name (FusionSolar
+# reports 0 while a site is offline). Anything not listed uses the reported value.
 CAPACITY_KW = {
-    # "Brenvei_K.K_navis": 150,   # offline — set its real installed kW here
+    # "Brenvei_K.K_navis": 150,
 }
 
 TZ = timezone(timedelta(hours=3))   # Ukraine (EEST)
@@ -42,59 +42,52 @@ def collect():
                                os.environ["FUSIONSOLAR_PASSWORD"])
     now = datetime.now(TZ)
     t_now = _ms(now)
-    t_daily = _ms(now - timedelta(days=95))
-    t_monthly = _ms(now - timedelta(days=820))
-    t_yearly = _ms(now - timedelta(days=2200))
+    t_daily = _ms(now - timedelta(days=400))
+    t_monthly = _ms(now - timedelta(days=1300))
+    t_yearly = _ms(now - timedelta(days=4000))
 
     stations = []
     for region in client.iter_regions():
         for st in region.get_stations():
-            dn = st.get("dn")
-            name = st.get("name")
+            dn, name = st.get("dn"), st.get("name")
             print(f"   • {name} ({dn})")
             rec = {
                 "name": name, "dn": dn, "region": region.region_code,
                 "status": st.get("plantStatus") or "unknown",
                 "nominal_kw": CAPACITY_KW.get(name) or _num(st.get("onlyInverterPower")),
                 "now_kw": _num(st.get("currentPower")),
-                "today_kwh": _num(st.get("dailyEnergy")),
-                "month_kwh": _num(st.get("monthEnergy")),
-                "year_kwh": _num(st.get("yearEnergy")),
-                "total_kwh": _num(st.get("cumulativeEnergy")),
                 "address": st.get("plantAddress") or "",
                 "lat": st.get("latitude"), "lon": st.get("longitude"),
                 "connected": (st.get("gridConnectedTime") or "")[:10],
             }
-            kpi = _safe(region.get_station_kpi, dn, default={})
-            rec["today_rev"] = _num(kpi.get("dailyIncome")) if isinstance(kpi, dict) else 0.0
-            # keep only true inverters (exclude meters / power sensors, whose
-            # 30014 signal is grid power and would corrupt the generation curve)
+            rec["price"] = _safe(region.get_station_price, dn, default={}); time.sleep(0.3)
+            today = _safe(region.get_energy_today, dn, default={}); time.sleep(0.4)
+            rec["metered"] = bool(today.get("metered"))
+            rec["today"] = today
+
+            # today's PV power curve: sum inverter active-power signals
             devices = _safe(region.get_inverters, dn)
             inverters = [d for d in devices
                          if "inverter" in ((d.get("type") or "") + " " + (d.get("name") or "")).lower()]
-            # per-inverter real-time signals + power curve; sum curves -> station curve
             agg = {}
             for inv in inverters:
-                idn = inv.get("dn")
-                inv["rt"] = _safe(region.get_inverter_realtime, idn, default={}); time.sleep(0.3)
-                inv["curve"] = _safe(region.get_inverter_curve, idn); time.sleep(0.3)
-                for p in inv["curve"]:
+                for p in _safe(region.get_inverter_curve, inv.get("dn")):
                     a = agg.setdefault(p["t"], {"sum": 0.0, "has": False})
                     if p["kw"] is not None:
                         a["sum"] += p["kw"]; a["has"] = True
-            rec["inverters"] = inverters
+                time.sleep(0.3)
+            rec["n_inverters"] = len(inverters)
             rec["today_curve"] = [{"t": t, "kw": round(agg[t]["sum"], 2) if agg[t]["has"] else None}
                                   for t in sorted(agg)]
-            rec["daily"] = _safe(region.get_history, dn, 4, t_daily, t_now); time.sleep(0.5)
-            rec["monthly"] = _safe(region.get_history, dn, 5, t_monthly, t_now); time.sleep(0.5)
-            rec["yearly"] = _safe(region.get_history, dn, 6, t_yearly, t_now); time.sleep(0.5)
+
+            rec["daily"] = _safe(region.get_history, dn, 4, t_daily, t_now, default=[]); time.sleep(0.5)
+            rec["monthly"] = _safe(region.get_history, dn, 5, t_monthly, t_now, default=[]); time.sleep(0.5)
+            rec["yearly"] = _safe(region.get_history, dn, 6, t_yearly, t_now, default=[]); time.sleep(0.5)
             rec["alarms"] = _safe(region.get_alarms, dn)
-            print(f"     curve={len(rec['today_curve'])} daily={len(rec['daily'])} "
-                  f"monthly={len(rec['monthly'])} yearly={len(rec['yearly'])} "
-                  f"inv={len(rec['inverters'])} rt={sum(1 for i in inverters if i.get('rt'))} "
-                  f"alarms={len(rec['alarms'])}")
+            print(f"     metered={rec['metered']} daily={len(rec['daily'])} monthly={len(rec['monthly'])} "
+                  f"yearly={len(rec['yearly'])} curvePts={len(rec['today_curve'])} alarms={len(rec['alarms'])}")
             stations.append(rec)
-            time.sleep(0.6)
+            time.sleep(0.5)
 
     bundle = {"updated": now.strftime("%Y-%m-%d %H:%M"), "tz": "Europe/Kyiv",
               "stations": stations}

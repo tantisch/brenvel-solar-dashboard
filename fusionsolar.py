@@ -160,13 +160,24 @@ class RegionSession:
                     out[key] = {"v": sig.get("value"), "u": sig.get("unit", "") or ""}
         return out
 
+    # report counter id -> friendly key
+    _COUNTERS = {
+        "productPower": "pv",       # PV generation (kWh)
+        "usePower": "load",         # total consumption / load (kWh)
+        "selfUsePower": "selfuse",  # PV used on-site (kWh)
+        "onGridPower": "export",    # exported to grid (kWh)
+        "buyPower": "imp",          # imported from grid (kWh)
+        "powerProfit": "rev",       # revenue (currency)
+    }
+
     def get_history(self, station_dn: str, stat_dim: int, t0_ms: int, t1_ms: int) -> list:
-        """Energy history via the report endpoint.
-        stat_dim: 4=daily, 5=monthly, 6=yearly. Returns [{label, kwh, rev}]."""
+        """Energy history via the report endpoint (stat_dim 4=daily/5=monthly/6=yearly).
+        Returns [{label, pv, load, selfuse, export, imp, rev}] with only the metrics
+        the station actually measures (unmetered sites have just pv + rev)."""
         body = {
-            "currencyUnit": "EUR", "orderBy": "statTime", "page": 1, "pageSize": 500,
+            "currencyUnit": "EUR", "orderBy": "statTime", "page": 1, "pageSize": 800,
             "moList": [{"moType": 20801, "moString": station_dn}],
-            "counterIDs": ["productPower", "onGridPower", "powerProfit"],
+            "counterIDs": list(self._COUNTERS.keys()),
             "sort": "asc", "statDim": stat_dim, "statTime": t0_ms, "statEndTime": t1_ms,
             "statType": "1", "station": "0", "timeZone": 3, "timeZoneStr": "Europe/Kiev",
         }
@@ -175,15 +186,48 @@ class RegionSession:
         rows = d.get("list") if isinstance(d, dict) else d
         out = []
         for x in (rows or []):
-            if x.get("productPower") is None:
+            label = x.get("fmtCollectTimeStr")
+            if not label or x.get("productPower") is None:
                 continue
-            out.append({
-                "label": x.get("fmtCollectTimeStr"),
-                "kwh": round(float(x.get("productPower") or 0), 1),
-                "rev": round(float(x.get("powerProfit") or 0), 2),
-            })
+            row = {"label": label}
+            for cid, key in self._COUNTERS.items():
+                if x.get(cid) is not None:
+                    row[key] = round(float(x[cid]), 2)
+            out.append(row)
         out.sort(key=lambda r: r["label"])
         return out
+
+    def _ebnum(self, d, key):
+        try:
+            return round(float(d.get(key)), 2)
+        except (TypeError, ValueError):
+            return None
+
+    def get_energy_today(self, station_dn: str) -> dict:
+        """Today's energy balance totals + ratios from the energy-balance endpoint."""
+        r = self._request(
+            "GET", "/rest/pvms/web/station/v1/overview/energy-balance",
+            params={"stationDn": station_dn, "timeDim": 2, "queryTime": _now_ms(),
+                    "timeZone": 3, "timeZoneStr": "Europe/Kiev", "_": _now_ms()},
+        )
+        d = r.json().get("data", {}) or {}
+        return {
+            "metered": bool(d.get("existMeter")),
+            "pv": self._ebnum(d, "totalProductPower"),
+            "load": self._ebnum(d, "totalUsePower"),
+            "selfuse": self._ebnum(d, "totalSelfUsePower"),
+            "export": self._ebnum(d, "totalOnGridPower"),
+            "imp": self._ebnum(d, "totalBuyPower"),
+            "self_suff": self._ebnum(d, "selfUsePowerRatioByUse"),     # % of load from PV
+            "self_cons": self._ebnum(d, "selfUsePowerRatioByProduct"),  # % of PV self-used
+        }
+
+    def get_station_price(self, station_dn: str) -> dict:
+        """Configured tariff plan names (purchase / feed-in)."""
+        r = self._request("GET", "/rest/pvms/web/electricityprice/station-price",
+                          params={"stationDn": station_dn, "_": _now_ms()})
+        d = r.json() or {}
+        return {"purchase": d.get("purchaseTariff"), "ongrid": d.get("onGridTariff")}
 
     def get_inverters(self, station_dn: str) -> list:
         """List inverters (and similar devices) under a station."""
