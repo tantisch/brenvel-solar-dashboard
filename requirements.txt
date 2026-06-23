@@ -1,0 +1,2 @@
+fusion_solar_py
+python-dotenv

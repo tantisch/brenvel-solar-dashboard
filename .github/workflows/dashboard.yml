@@ -1,0 +1,74 @@
+name: Build & publish solar dashboard
+
+# Runs every 30 minutes during daylight (UTC; Ukraine is UTC+2 winter / +3 summer)
+# and can also be triggered manually from the Actions tab.
+on:
+  schedule:
+    - cron: "*/30 1-20 * * *"
+  workflow_dispatch:
+
+# Permissions required to publish to GitHub Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deployment at a time.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Pull live data & build dashboard
+        env:
+          FUSIONSOLAR_USER: ${{ secrets.FUSIONSOLAR_USER }}
+          FUSIONSOLAR_PASSWORD: ${{ secrets.FUSIONSOLAR_PASSWORD }}
+        run: python build_dashboard.py
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Password-protect the dashboard (StatiCrypt)
+        env:
+          STATICRYPT_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+        run: |
+          mkdir -p site_src public
+          cp output/dashboard.html site_src/index.html
+          npx -y staticrypt@3 site_src/index.html --short \
+            --salt 9d90a60f8bcf475e741e4bd5b63c41b0 \
+            --remember 30 \
+            --template-title "Brenvel Solar Fleet" \
+            --template-instructions "Enter the team password to view the live solar dashboard." \
+            --template-color-primary "#16a34a" \
+            --template-button "View dashboard" \
+            --template-placeholder "Team password" \
+            -d public
+          test -f public/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

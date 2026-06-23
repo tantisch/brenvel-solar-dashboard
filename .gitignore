@@ -1,0 +1,20 @@
+# Secrets — never commit credentials
+.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Output data
+output/
+*.csv
+*.xlsx
+
+# Build / tooling artifacts
+.claude/
+.staticrypt.json
+site_src/
+public/
+node_modules/
