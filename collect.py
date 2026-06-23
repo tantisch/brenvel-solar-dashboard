@@ -59,7 +59,11 @@ def collect():
             }
             kpi = _safe(region.get_station_kpi, dn, default={})
             rec["today_rev"] = _num(kpi.get("dailyIncome")) if isinstance(kpi, dict) else 0.0
-            rec["inverters"] = _safe(region.get_inverters, dn)
+            # keep only true inverters (exclude meters / power sensors, whose
+            # 30014 signal is grid power and would corrupt the generation curve)
+            devices = _safe(region.get_inverters, dn)
+            rec["inverters"] = [d for d in devices
+                                if "inverter" in ((d.get("type") or "") + " " + (d.get("name") or "")).lower()]
             inv_dns = [i["dn"] for i in rec["inverters"] if i.get("dn")]
             rec["today_curve"] = _safe(region.get_power_curve, inv_dns); time.sleep(0.4)
             rec["daily"] = _safe(region.get_history, dn, 4, t_daily, t_now); time.sleep(0.5)

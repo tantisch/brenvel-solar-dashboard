@@ -115,9 +115,14 @@ class RegionSession:
     _NODATA = 1.0e308   # FusionSolar's "no value" sentinel (1.7976931348623157e308)
 
     def get_power_curve(self, inverter_dns: list) -> list:
-        """Today's intraday PV power curve (kW, 5-min), summed across a station's
-        inverters. Uses the dense inverter active-power signal (30014)."""
-        sums, offs = {}, {}
+        """Today's intraday PV power curve (kW), summed across a station's
+        INVERTERS only (pass inverter DNs — never meters/sensors, whose 30014
+        signal is grid power, not generation).
+
+        Returns the full-day 5-minute timeline [{t:'HH:MM', kw:float|None}].
+        Slots with no inverter telemetry (night gaps, future) are None so the
+        chart leaves them blank rather than inventing a value."""
+        grid = {}   # startTime -> {"sum":kW, "has":bool, "off":seconds}
         for dn in inverter_dns:
             r = self._request(
                 "GET", "/rest/pvms/web/device/v1/device-history-data",
@@ -126,15 +131,20 @@ class RegionSession:
             )
             node = (r.json().get("data", {}) or {}).get("30014", {}) or {}
             for p in node.get("pmDataList", []) or []:
-                v, st = p.get("counterValue"), p.get("startTime")
-                if v is None or st is None or float(v) >= self._NODATA:
+                st = p.get("startTime")
+                if st is None:
                     continue
-                sums[st] = sums.get(st, 0.0) + float(v)
-                offs[st] = (p.get("timeZoneOffset", 0) + p.get("dstOffset", 0)) * 60
+                g = grid.setdefault(st, {"sum": 0.0, "has": False,
+                    "off": (p.get("timeZoneOffset", 0) + p.get("dstOffset", 0)) * 60})
+                v = p.get("counterValue")
+                if v is not None and float(v) < self._NODATA:
+                    g["sum"] += float(v)
+                    g["has"] = True
         out = []
-        for st in sorted(sums):
-            hhmm = time.strftime("%H:%M", time.gmtime(st + offs[st]))
-            out.append({"t": hhmm, "kw": round(sums[st], 2)})
+        for st in sorted(grid):
+            g = grid[st]
+            hhmm = time.strftime("%H:%M", time.gmtime(st + g["off"]))
+            out.append({"t": hhmm, "kw": round(g["sum"], 2) if g["has"] else None})
         return out
 
     def get_history(self, station_dn: str, stat_dim: int, t0_ms: int, t1_ms: int) -> list:
