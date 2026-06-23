@@ -10,10 +10,12 @@ All 5 locations appear in one unified view (no region split).
 
 | File | Purpose |
 |------|---------|
-| `fusionsolar.py` | Multi-region FusionSolar web client (handles the two-region login). |
-| `build_dashboard.py` | Pulls live data → `output/dashboard.html` (self-contained) + `output/data.json`. |
-| `export_stations.py` | Same data as a CSV snapshot in `output/`. |
-| `.github/workflows/dashboard.yml` | Scheduled cloud job that builds, encrypts, and publishes the dashboard. |
+| `fusionsolar.py` | Multi-region FusionSolar web client: two-region login + data (live, intraday curve, daily/monthly/yearly history, inverters, alarms). |
+| `collect.py` | Pulls the full dataset for every station → `output/data.json`. |
+| `site_template.html` | The dashboard UI (overview + per-location deep-dive, Chart.js). Data is injected at build time. |
+| `build_dashboard.py` | Runs `collect.py` and injects the data into the template → `output/dashboard.html` (self-contained). |
+| `export_stations.py` | A flat CSV snapshot of all stations in `output/`. |
+| `.github/workflows/dashboard.yml` | Cloud job (schedule + on push) that builds, encrypts, and publishes the dashboard. |
 | `.env` | Your FusionSolar login (gitignored — never committed). |
 
 ## Run it locally

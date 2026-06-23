@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brenvel Solar Fleet</title>
+<style>
+  :root{
+    --bg:#eef2f6; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --faint:#94a3b8;
+    --line:#e7edf3; --green:#16a34a; --green2:#22c55e; --amber:#f59e0b; --red:#ef4444; --grey:#94a3b8;
+    --blue:#2563eb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{max-width:1720px;margin:0 auto;padding:0 28px 48px}
+  /* header */
+  header{position:sticky;top:0;z-index:20;background:rgba(238,242,246,.86);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  .bar{max-width:1720px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .brand{font-size:19px;font-weight:800;letter-spacing:-.3px;display:flex;align-items:center;gap:9px;white-space:nowrap}
+  nav{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+  .tab{border:0;background:transparent;color:var(--muted);font:inherit;font-size:14px;font-weight:600;
+    padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+  .tab:hover{background:#e2e8f0;color:var(--ink)}
+  .tab.active{background:var(--ink);color:#fff}
+  .meta{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .live{display:inline-flex;align-items:center;gap:6px;background:#dcfce7;color:#15803d;font-weight:700;
+    font-size:11px;padding:5px 10px;border-radius:999px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green2);animation:p 1.6s infinite}
+  @keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+  /* kpi */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:14px;margin:24px 0}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:16px 18px}
+  .kpi .k{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+  .kpi .v{font-size:25px;font-weight:800;margin-top:7px;letter-spacing:-.6px;line-height:1}
+  .kpi .u{font-size:13px;color:var(--faint);font-weight:700}
+  .kpi .s{font-size:12px;color:var(--muted);margin-top:5px}
+  /* alert */
+  .alert{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:13px;padding:13px 18px;
+    font-size:14px;font-weight:500;margin-bottom:22px;display:flex;gap:10px;align-items:center}
+  /* cards/charts */
+  h2.sec{font-size:15px;font-weight:800;letter-spacing:-.2px;margin:30px 0 14px;color:#334155}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px}
+  .panel h3{margin:0 0 4px;font-size:15px;font-weight:700}
+  .panel .sub{color:var(--faint);font-size:12.5px;margin-bottom:14px}
+  .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:18px}
+  .full{grid-column:1/-1}
+  .cwrap{position:relative;width:100%;height:300px}
+  .cwrap.tall{height:330px}
+  /* station cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:16px}
+  .scard{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:18px;cursor:pointer;
+    border-top:4px solid var(--grey);transition:transform .12s,box-shadow .12s}
+  .scard:hover{transform:translateY(-3px);box-shadow:0 12px 28px -14px rgba(15,23,42,.28)}
+  .scard .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .scard .nm{font-weight:700;font-size:16px}
+  .badge{font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;color:#fff;white-space:nowrap}
+  .scard .now{font-size:30px;font-weight:800;margin:12px 0 0;letter-spacing:-1px}
+  .scard .now u{font-size:14px;color:var(--faint);font-weight:700;font-style:normal}
+  .mini{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  .mini .l{font-size:10.5px;color:var(--faint);font-weight:700;text-transform:uppercase}
+  .mini .x{font-size:14px;font-weight:700;margin-top:2px}
+  /* detail header */
+  .dhead{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:flex-start;margin:22px 0 4px}
+  .dhead .h1{font-size:26px;font-weight:800;letter-spacing:-.6px;display:flex;align-items:center;gap:12px}
+  .dhead .addr{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:560px}
+  .pill{display:inline-flex;gap:6px;align-items:center;background:#fff;border:1px solid var(--line);
+    border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:600;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);font-weight:700}
+  td.r,th.r{text-align:right}
+  .ok{color:var(--green);font-weight:700}
+  .foot{text-align:center;color:var(--faint);font-size:12px;margin-top:34px}
+  @media(max-width:640px){.wrap{padding:0 16px 40px}.bar{padding:12px 16px}.charts{grid-template-columns:1fr}
+    .cwrap{height:260px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">☀️ Brenvel Solar Fleet</div>
+    <nav id="nav"></nav>
+    <div class="meta"><span id="upd"></span><span class="live"><span class="dot"></span>LIVE</span></div>
+  </div>
+</header>
+<div class="wrap"><div id="view"></div>
+  <div class="foot" id="foot"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const DATA = __DATA__;
+const S = DATA.stations;
+const ST = {connected:['#16a34a','Online'],disconnected:['#94a3b8','Offline'],
+  trouble:['#f59e0b','Warning'],unknown:['#94a3b8','Unknown']};
+const CO2 = 0.45; // kg CO2 avoided per kWh (grid average)
+const COLORS = ['#16a34a','#2563eb','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899'];
+const fmt = (n,d=0)=> (n==null||isNaN(n))?'–':Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const stCol = s => (ST[s]||ST.unknown)[0];
+const stLbl = s => (ST[s]||ST.unknown)[1];
+let charts = [];
+function clearCharts(){ charts.forEach(c=>c.destroy()); charts=[]; }
+
+function kpi(k,v,u,s){ return `<div class="kpi"><div class="k">${k}</div>
+  <div class="v">${v} ${u?`<span class="u">${u}</span>`:''}</div>${s?`<div class="s">${s}</div>`:''}</div>`; }
+
+/* ---------- charts ---------- */
+function lineChart(id,labels,data,color,fillTo){
+  const ctx=document.getElementById(id); if(!ctx)return;
+  charts.push(new Chart(ctx,{type:'line',data:{labels,datasets:[{data,borderColor:color,
+    backgroundColor:color+'22',borderWidth:2,fill:true,tension:.35,pointRadius:0,pointHoverRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{intersect:false,mode:'index'},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmt(c.parsed.y,1)} kW`}}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:9,color:'#94a3b8',font:{size:11}}},
+        y:{beginAtZero:true,grid:{color:'#eef2f6'},ticks:{color:'#94a3b8',font:{size:11},callback:v=>v+' kW'}}}}}));
+}
+function barChart(id,labels,data,color,unit='kWh'){
+  const ctx=document.getElementById(id); if(!ctx)return;
+  charts.push(new Chart(ctx,{type:'bar',data:{labels,datasets:[{data,backgroundColor:color,
+    borderRadius:5,maxBarThickness:46}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmt(c.parsed.y,0)} ${unit}`}}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:16,color:'#94a3b8',font:{size:11}}},
+        y:{beginAtZero:true,grid:{color:'#eef2f6'},ticks:{color:'#94a3b8',font:{size:11},
+          callback:v=>v>=1000?(v/1000)+'k':v}}}}}));
+}
+function stackedDaily(id){
+  const ctx=document.getElementById(id); if(!ctx)return;
+  const labels=[...new Set(S.flatMap(s=>s.daily.map(d=>d.label)))].sort().slice(-30);
+  const ds=S.map((s,i)=>{const m=Object.fromEntries(s.daily.map(d=>[d.label,d.kwh]));
+    return {label:s.name.replace('Brenvel_','').replace('Brenvei_',''),data:labels.map(l=>m[l]||0),
+      backgroundColor:COLORS[i%COLORS.length],borderRadius:3,maxBarThickness:30};});
+  charts.push(new Chart(ctx,{type:'bar',data:{labels:labels.map(l=>l.slice(5)),datasets:ds},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10,boxHeight:10,font:{size:11},color:'#64748b',usePointStyle:true}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.parsed.y,0)} kWh`}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{maxTicksLimit:15,color:'#94a3b8',font:{size:10}}},
+        y:{stacked:true,beginAtZero:true,grid:{color:'#eef2f6'},ticks:{color:'#94a3b8',font:{size:11},callback:v=>v>=1000?(v/1000)+'k':v}}}}}));
+}
+
+/* ---------- overview ---------- */
+function overview(){
+  clearCharts();
+  const now=S.reduce((a,s)=>a+s.now_kw,0), today=S.reduce((a,s)=>a+s.today_kwh,0);
+  const month=S.reduce((a,s)=>a+s.month_kwh,0), year=S.reduce((a,s)=>a+s.year_kwh,0);
+  const life=S.reduce((a,s)=>a+s.total_kwh,0), rev=S.reduce((a,s)=>a+(s.today_rev||0),0);
+  const online=S.filter(s=>s.status==='connected').length;
+  const probs=S.filter(s=>s.status!=='connected');
+  const v=document.getElementById('view');
+  v.innerHTML=`
+    <div class="kpis">
+      ${kpi('Live power',fmt(now,1),'kW','across '+S.length+' sites')}
+      ${kpi('Energy today',fmt(today),'kWh','€'+fmt(rev)+' earned')}
+      ${kpi('This month',fmt(month),'kWh')}
+      ${kpi('This year',fmt(year),'kWh')}
+      ${kpi('Lifetime',fmt(life/1000,1),'MWh')}
+      ${kpi('CO₂ avoided',fmt(life*CO2/1000),'t','lifetime')}
+      ${kpi('Sites online',online+' / '+S.length,'', online<S.length?'⚠ '+(S.length-online)+' need attention':'all healthy')}
+    </div>
+    ${probs.length?`<div class="alert">⚠️ <b>${probs.length} site(s) need attention:</b> ${probs.map(p=>p.name.replace('Brenve'+(p.name.includes('Brenvei')?'i':'l')+'_','')+' ('+stLbl(p.status).toLowerCase()+')').join(', ')}</div>`:''}
+    <h2 class="sec">Fleet output — last 30 days (by site)</h2>
+    <div class="panel"><div class="cwrap tall"><canvas id="cFleet"></canvas></div></div>
+    <h2 class="sec">Compare sites</h2>
+    <div class="charts">
+      <div class="panel"><h3>Produced today</h3><div class="sub">kWh per site</div><div class="cwrap"><canvas id="cToday"></canvas></div></div>
+      <div class="panel"><h3>This month</h3><div class="sub">kWh per site</div><div class="cwrap"><canvas id="cMonth"></canvas></div></div>
+    </div>
+    <h2 class="sec">All locations</h2>
+    <div class="cards">${S.map((s,i)=>scard(s,i)).join('')}</div>`;
+  stackedDaily('cFleet');
+  const short=S.map(s=>s.name.replace('Brenvel_','').replace('Brenvei_',''));
+  barChart('cToday',short,S.map(s=>s.today_kwh),'#16a34a');
+  barChart('cMonth',short,S.map(s=>s.month_kwh),'#2563eb');
+}
+function scard(s,i){
+  const c=stCol(s.status);
+  return `<div class="scard" style="border-top-color:${c}" onclick="go(${i})">
+    <div class="top"><div class="nm">${s.name}</div><div class="badge" style="background:${c}">${stLbl(s.status)}</div></div>
+    <div class="now">${fmt(s.now_kw,1)}<u> kW now</u></div>
+    <div class="mini">
+      <div><div class="l">Today</div><div class="x">${fmt(s.today_kwh)}</div></div>
+      <div><div class="l">Month</div><div class="x">${fmt(s.month_kwh)}</div></div>
+      <div><div class="l">Lifetime</div><div class="x">${fmt(s.total_kwh/1000,1)}M</div></div>
+    </div></div>`;
+}
+
+/* ---------- station detail ---------- */
+function station(i){
+  clearCharts();
+  const s=S[i], c=stCol(s.status);
+  const peak=Math.max(0,...s.today_curve.map(p=>p.kw));
+  const mapUrl=(s.lat&&s.lon)?`https://www.google.com/maps?q=${s.lat},${s.lon}`:null;
+  const daily=s.daily.slice(-30), monthly=s.monthly.slice(-18), yearly=s.yearly;
+  const v=document.getElementById('view');
+  v.innerHTML=`
+    <div class="dhead">
+      <div>
+        <div class="h1"><span style="width:13px;height:13px;border-radius:50%;background:${c};display:inline-block"></span>${s.name}</div>
+        <div class="addr">📍 ${s.address||'—'}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="pill" style="color:${c}">● ${stLbl(s.status)}</span>
+        <span class="pill">${s.inverters.length} inverter${s.inverters.length!=1?'s':''}</span>
+        <span class="pill">Connected ${s.connected||'—'}</span>
+        ${mapUrl?`<a class="pill" href="${mapUrl}" target="_blank" rel="noopener">🗺 Map</a>`:''}
+      </div>
+    </div>
+    <div class="kpis">
+      ${kpi('Power now',fmt(s.now_kw,1),'kW')}
+      ${kpi('Peak today',fmt(peak,1),'kW')}
+      ${kpi('Energy today',fmt(s.today_kwh),'kWh','€'+fmt(s.today_rev))}
+      ${kpi('This month',fmt(s.month_kwh),'kWh')}
+      ${kpi('This year',fmt(s.year_kwh),'kWh')}
+      ${kpi('Lifetime',fmt(s.total_kwh/1000,1),'MWh')}
+      ${kpi('CO₂ lifetime',fmt(s.total_kwh*CO2/1000),'t')}
+    </div>
+    <div class="charts">
+      <div class="panel full"><h3>Power today</h3><div class="sub">kW · 5-minute resolution</div>
+        <div class="cwrap tall"><canvas id="dCurve"></canvas></div></div>
+      <div class="panel"><h3>Daily production</h3><div class="sub">last 30 days · kWh</div>
+        <div class="cwrap"><canvas id="dDaily"></canvas></div></div>
+      <div class="panel"><h3>Monthly production</h3><div class="sub">kWh</div>
+        <div class="cwrap"><canvas id="dMonthly"></canvas></div></div>
+      <div class="panel"><h3>Yearly production</h3><div class="sub">kWh</div>
+        <div class="cwrap"><canvas id="dYearly"></canvas></div></div>
+      <div class="panel"><h3>Inverters &amp; alarms</h3><div class="sub">${s.inverters.length} device(s)</div>
+        ${invTable(s)}</div>
+    </div>`;
+  if(s.today_curve.length) lineChart('dCurve',s.today_curve.map(p=>p.t),s.today_curve.map(p=>p.kw),c);
+  else noData('dCurve','No live data today (site offline)');
+  barChart('dDaily',daily.map(d=>d.label.slice(5)),daily.map(d=>d.kwh),'#16a34a');
+  barChart('dMonthly',monthly.map(d=>d.label),monthly.map(d=>d.kwh),'#2563eb');
+  barChart('dYearly',yearly.map(d=>d.label),yearly.map(d=>d.kwh),'#8b5cf6');
+}
+function invTable(s){
+  let h=`<table><tr><th>Inverter</th><th>Type</th><th class="r">Status</th></tr>`+
+    s.inverters.map(d=>`<tr><td>${d.name||d.dn}</td><td>${d.type||'—'}</td>
+      <td class="r">${s.status==='connected'?'<span class="ok">● running</span>':'—'}</td></tr>`).join('')+`</table>`;
+  if(s.alarms.length){
+    h+=`<div style="margin-top:14px"><div class="sub" style="color:#92400e">Active alarms</div>`+
+      s.alarms.map(a=>`<div class="alert" style="margin:0 0 8px">⚠️ <b>${a.name}</b>${a.device?' — '+a.device:''}</div>`).join('')+`</div>`;
+  } else {
+    h+=`<div style="margin-top:12px" class="ok">✓ No active alarms</div>`;
+  }
+  return h;
+}
+function noData(id,msg){
+  const c=document.getElementById(id); if(c)c.parentElement.innerHTML=`<div style="display:flex;height:100%;align-items:center;justify-content:center;color:#94a3b8;font-size:14px">${msg}</div>`;
+}
+
+/* ---------- nav / routing ---------- */
+function renderNav(active){
+  const items=[['Overview',-1],...S.map((s,i)=>[s.name.replace('Brenvel_','').replace('Brenvei_',''),i])];
+  document.getElementById('nav').innerHTML=items.map(([n,i])=>
+    `<button class="tab ${active===i?'active':''}" onclick="go(${i})">${n}</button>`).join('');
+}
+function go(i){ renderNav(i); window.scrollTo({top:0,behavior:'smooth'});
+  if(i<0) overview(); else station(i); }
+document.getElementById('upd').textContent='Updated '+DATA.updated;
+document.getElementById('foot').innerHTML='Auto-generated from FusionSolar · '+DATA.updated+' ('+(DATA.tz||'')+') · refreshes every 30 min';
+renderNav(-1); overview();
+</script>
+</body>
+</html>
