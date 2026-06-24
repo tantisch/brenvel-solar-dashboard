@@ -100,7 +100,7 @@ const monAgo=n=>{const d=new Date(TODAY);d.setMonth(d.getMonth()-n);return d.toI
 const RPRESETS=[['today','Сьогодні'],['7d','7 днів'],['30d','30 днів'],['month','Цей місяць'],['90d','90 днів'],['year','Цей рік'],['12m','12 місяців'],['all','Весь час']];
 function resolveRange(){
   const k=RANGE.key, end=TODAY;
-  if(k==='today')  return {gran:'today'};
+  if(k==='today')  return {gran:'daily', from:end, to:end, title:'сьогодні'};
   if(k==='7d')     return {gran:'daily', from:isoAgo(6),  to:end, title:'останні 7 днів'};
   if(k==='30d')    return {gran:'daily', from:isoAgo(29), to:end, title:'останні 30 днів'};
   if(k==='90d')    return {gran:'daily', from:isoAgo(89), to:end, title:'останні 90 днів'};
@@ -274,6 +274,7 @@ function station(i){
       ${kpi('Потужність зараз',fmt(s.now_kw,1),'кВт')}
       ${kpi('Пік сьогодні',fmt(peak,1),'кВт')}
       ${kpi('Генерація сьогодні',fmt(td.pv),'кВт·год',null,1)}
+      ${(s.today_rev!=null)?kpi('Дохід сьогодні',' €'+fmt(s.today_rev),'',s.eur_kwh?'≈ €'+fmt(s.eur_kwh,3)+'/кВт·год':''):''}
       ${s.metered?kpi('Споживання',fmt(td.load),'кВт·год'):''}
       ${s.metered?kpi('Самоспоживання ПВ',td.self_cons!=null?fmt(td.self_cons,0):'—','%','генерації спожито на місці'):''}
       ${s.metered?kpi('Самозабезпечення',td.self_suff!=null?fmt(td.self_suff,0):'—','%','навантаження з ПВ'):''}

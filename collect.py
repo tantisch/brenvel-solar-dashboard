@@ -101,11 +101,17 @@ def collect():
                     hist = _safe(ne.get_plant_history, node, default={})
                     p.update({
                         "today": {"metered": False, "pv": p["today_kwh"]},
-                        "today_rev": None, "price": {},
-                        "n_inverters": p.get("device_num", 0), "alarms": [],
+                        "price": {}, "n_inverters": p.get("device_num", 0), "alarms": [],
                         "daily": hist.get("daily", []), "monthly": hist.get("monthly", []),
                         "yearly": hist.get("yearly", []), "today_curve": hist.get("today_curve", []),
                     })
+                    # estimate income per period from the lifetime effective €/kWh
+                    eur_kwh = (p["total_rev"] / p["total_kwh"]) if p.get("total_kwh") else 0
+                    for arr_ in (p["daily"], p["monthly"], p["yearly"]):
+                        for d in arr_:
+                            d["rev"] = round(d["pv"] * eur_kwh, 2)
+                    p["today_rev"] = round(p["today_kwh"] * eur_kwh, 2)
+                    p["eur_kwh"] = round(eur_kwh, 4)
                     stations.append(p)   # always keep the plant (history is best-effort)
                     print(f"   • {p['name']} (NetEco) now={p['now_kw']}kW daily={len(p['daily'])} "
                           f"monthly={len(p['monthly'])} yearly={len(p['yearly'])} curve={len(p['today_curve'])}")

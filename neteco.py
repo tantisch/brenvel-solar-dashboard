@@ -187,7 +187,11 @@ class NetEcoClient:
                 yearly.append({"label": str(row[0]).strip(), "pv": round(e, 1)})
         yearly.sort(key=lambda r: r["label"])
 
-        curve, nown = [], now.replace(tzinfo=None)
+        # today's intraday power: collect real datapoints up to now, then pad to
+        # a full 24h 5-min timeline (None after) so the chart spans 00:00-23:55
+        # but only paints the data we actually have.
+        nown = now.replace(tzinfo=None)
+        slots = {}
         for row in self._stat_rows("querySystemPowerStatDay.action", node_sn, now.strftime("%Y-%m-%d")):
             try:
                 dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
@@ -195,7 +199,9 @@ class NetEcoClient:
                 continue
             kw = _num(row[1], None)
             if dt <= nown and kw is not None:
-                curve.append({"t": dt.strftime("%H:%M"), "kw": round(kw, 2)})
+                slots[dt.strftime("%H:%M")] = round(kw, 2)
+        curve = [{"t": f"{hh:02d}:{mm:02d}", "kw": slots.get(f"{hh:02d}:{mm:02d}")}
+                 for hh in range(24) for mm in range(0, 60, 5)]
 
         return {"daily": daily, "monthly": monthly, "yearly": yearly, "today_curve": curve}
 
