@@ -1,12 +1,13 @@
 name: Build & publish solar dashboard
 
-# Runs every 30 minutes during daylight (UTC; Ukraine is UTC+2 winter / +3 summer)
-# and can also be triggered manually from the Actions tab.
+# GitHub throttles frequent `schedule` crons heavily (it often fires only every
+# ~2h). So instead of relying on the scheduler for cadence, a single run LOOPS
+# internally — rebuilding and republishing every ~15 minutes — and deploys by
+# pushing the encrypted page to the `gh-pages` branch (served by GitHub Pages).
+# The schedule/dispatch just (re)starts the loop if it ever stops. The
+# concurrency group guarantees only one loop is ever running.
 on:
   schedule:
-    # GitHub throttles frequent cron heavily on free/public repos (often only
-    # runs ~hourly). Requesting every 15 min maximises the chance of fresher
-    # runs; for guaranteed cadence use an external pinger -> repository_dispatch.
     - cron: "*/15 * * * *"
   workflow_dispatch:
   repository_dispatch:
@@ -14,72 +15,68 @@ on:
   push:
     branches: [main]
 
-# Permissions required to publish to GitHub Pages.
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write          # push the built site to the gh-pages branch
 
-# Only one Pages deployment at a time.
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: solar-dashboard
+  cancel-in-progress: true # a newer run replaces the looping one (single loop)
 
 jobs:
-  build-and-deploy:
+  run:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    timeout-minutes: 335    # loop exits at ~5h; safely under the 6h hard cap
     steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Pull live data & build dashboard
+      - run: pip install -r requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build, encrypt and publish every ~15 minutes
         env:
           FUSIONSOLAR_USER: ${{ secrets.FUSIONSOLAR_USER }}
           FUSIONSOLAR_PASSWORD: ${{ secrets.FUSIONSOLAR_PASSWORD }}
           NETECO_USER: ${{ secrets.NETECO_USER }}
           NETECO_PASSWORD: ${{ secrets.NETECO_PASSWORD }}
-        run: python build_dashboard.py
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Password-protect the dashboard (StatiCrypt)
-        env:
           STATICRYPT_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+          REPO_SLUG: ${{ github.repository }}
         run: |
-          mkdir -p site_src public
-          cp output/dashboard.html site_src/index.html
-          npx -y staticrypt@3 site_src/index.html --short \
-            --salt 9d90a60f8bcf475e741e4bd5b63c41b0 \
-            --remember 30 \
-            --template-title "Сонячний парк Brenvel" \
-            --template-instructions "Введіть пароль команди, щоб переглянути панель сонячних станцій." \
-            --template-color-primary "#16a34a" \
-            --template-button "Переглянути панель" \
-            --template-placeholder "Пароль" \
-            --template-remember "Запам'ятати мене" \
-            --template-error "Невірний пароль" \
-            -d public
-          test -f public/index.html
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: public
-
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@v4
+          REPO="https://x-access-token:${GH_TOKEN}@github.com/${REPO_SLUG}.git"
+          END=$(( $(date +%s) + 18000 ))   # loop for ~5h, then exit (gets restarted)
+          n=0
+          while [ "$(date +%s)" -lt "$END" ]; do
+            START=$(date +%s); n=$((n+1))
+            echo "::group::cycle $n  $(date -u +%FT%TZ)"
+            (
+              set -e
+              python build_dashboard.py
+              rm -rf build site && mkdir -p build
+              cp output/dashboard.html build/index.html
+              npx -y staticrypt@3 build/index.html --short \
+                --salt 9d90a60f8bcf475e741e4bd5b63c41b0 --remember 30 \
+                --template-title "Сонячний парк Brenvel" \
+                --template-instructions "Введіть пароль команди, щоб переглянути панель сонячних станцій." \
+                --template-color-primary "#16a34a" \
+                --template-button "Переглянути панель" \
+                --template-placeholder "Пароль" \
+                --template-remember "Запам'ятати мене" \
+                --template-error "Невірний пароль" \
+                -d site
+              test -f site/index.html
+              touch site/.nojekyll
+              cd site
+              git init -q
+              git checkout -q -b gh-pages
+              git add -A
+              git -c user.email=actions@github.com -c user.name="solar-bot" commit -q -m "update $(date -u +%FT%TZ)"
+              git push -q -f "$REPO" gh-pages
+            ) && echo "published cycle $n" || echo "cycle $n failed; previous version kept live"
+            echo "::endgroup::"
+            EL=$(( $(date +%s) - START )); S=$(( 900 - EL )); [ "$S" -lt 30 ] && S=30
+            echo "next cycle in ${S}s"; sleep "$S"
+          done
+          echo "loop window elapsed; exiting (schedule/dispatch will restart it)"
