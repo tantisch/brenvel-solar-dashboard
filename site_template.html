@@ -161,6 +161,16 @@ function line(id,labels,data,color){
       scales:{x:{grid:{display:false},ticks:{maxTicksLimit:9,color:'#94a3b8',font:{size:11}}},
         y:{beginAtZero:true,grid:{color:'#eef2f6'},ticks:{color:'#94a3b8',font:{size:11},callback:v=>v+' кВт'}}}}}));
 }
+function lines(id,labels,sets){
+  const ctx=document.getElementById(id); if(!ctx)return;
+  charts.push(new Chart(ctx,{type:'line',data:{labels,datasets:sets.map(s=>({label:s.l,data:s.d,borderColor:s.c,
+    backgroundColor:s.c+'18',borderWidth:2,fill:true,tension:.35,pointRadius:0,pointHoverRadius:4,spanGaps:false}))},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{intersect:false,mode:'index'},
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10,boxHeight:10,usePointStyle:true,font:{size:12},color:'#475569'}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.parsed.y,1)} кВт`}}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:9,color:'#94a3b8',font:{size:11}}},
+        y:{beginAtZero:true,grid:{color:'#eef2f6'},ticks:{color:'#94a3b8',font:{size:11},callback:v=>v+' кВт'}}}}}));
+}
 
 /* ---------- OVERVIEW ---------- */
 function overview(){
@@ -189,7 +199,7 @@ function overview(){
       ${kpi('У мережу',t.exp!=null?fmt(t.exp):'—','кВт·год','надлишок ПВ')}
       ${kpi('Станцій онлайн',S.filter(s=>s.status==='connected').length+' / '+S.length,'',probs.length?'⚠ '+probs.length+' проблемних':'усі справні')}
     </div>
-    <h2 class="sec">Генерація по станціях — ${R.title}</h2>
+    <h2 class="sec">Генерація по станціях — ${R.title} <span style="font-weight:600;font-size:12px;color:#94a3b8">· натисніть станцію в легенді, щоб приховати/показати</span></h2>
     <div class="panel"><div class="cwrap tall"><canvas id="oGen"></canvas></div></div>
     <h2 class="sec">Усі станції</h2>
     <div class="cards">${S.map((s,i)=>scard(s,i,agg(s,R),R)).join('')}</div>`;
@@ -281,7 +291,7 @@ function station(i){
       ${s.metered?kpi('У мережу сьогодні',fmt(td.export),'кВт·год','надлишок'):''}
       ${s.metered?kpi('З мережі сьогодні',fmt(td.imp),'кВт·год','імпорт'):''}
     </div>
-    <div class="panel full"><h3>Потужність ПВ сьогодні</h3><div class="sub">кВт · крок 5 хв · прогалини — немає даних</div>
+    <div class="panel full"><h3>${(s.metered&&s.today_overlap&&s.today_overlap.length)?'Генерація ПВ та споживання — сьогодні':'Потужність ПВ сьогодні'}</h3><div class="sub">кВт · крок 5 хв · повний день, прогалини — немає даних</div>
       <div class="cwrap tall"><canvas id="dCurve"></canvas></div></div>
 
     <h2 class="sec">Аналіз за період</h2>
@@ -308,7 +318,9 @@ function station(i){
     <h2 class="sec">Аварії</h2>
     <div class="panel">${(s.alarms&&s.alarms.length)?s.alarms.map(al=>`<div class="alert" style="margin:0 0 8px">⚠️ <b>${al.name}</b>${al.device?' — '+al.device:''}</div>`).join(''):'<div class="ok">✓ Немає активних аварій</div>'}</div>`;
 
-  if(s.today_curve.some(p=>p.kw!=null)) line('dCurve',s.today_curve.map(p=>p.t),s.today_curve.map(p=>p.kw),c);
+  if(s.metered&&s.today_overlap&&s.today_overlap.some(p=>p.pv!=null||p.load!=null))
+    lines('dCurve',s.today_overlap.map(p=>p.t),[{l:'Генерація ПВ',d:s.today_overlap.map(p=>p.pv),c:'#16a34a'},{l:'Споживання',d:s.today_overlap.map(p=>p.load),c:'#64748b'}]);
+  else if(s.today_curve.some(p=>p.kw!=null)) line('dCurve',s.today_curve.map(p=>p.t),s.today_curve.map(p=>p.kw),c);
   else noData('dCurve','Немає даних за сьогодні (станція офлайн)');
   const L=a.data.map(d=>lbl(d.label,R.gran));
   if(s.metered) bars('dGenLoad',L,[{l:'Генерація ПВ',d:a.data.map(d=>d.pv),c:C.pv},{l:'Споживання',d:a.data.map(d=>d.load),c:C.load}]);

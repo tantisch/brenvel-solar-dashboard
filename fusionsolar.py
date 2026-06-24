@@ -20,6 +20,7 @@ Auth flow (reverse-engineered from the FusionSolar login bundle):
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone, timedelta
 from typing import Iterator, Optional
 
 import requests
@@ -221,6 +222,31 @@ class RegionSession:
             "self_suff": self._ebnum(d, "selfUsePowerRatioByUse"),     # % of load from PV
             "self_cons": self._ebnum(d, "selfUsePowerRatioByProduct"),  # % of PV self-used
         }
+
+    def get_today_balance(self, station_dn: str) -> list:
+        """Today's intraday PV vs load curve (metered sites). Returns the full
+        24h 5-min timeline [{t:'HH:MM', pv:kW|None, load:kW|None}]. Must query
+        with queryTime = start-of-day (else only the last hour is returned)."""
+        tz = timezone(timedelta(hours=3))
+        day0 = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        r = self._request(
+            "GET", "/rest/pvms/web/station/v1/overview/energy-balance",
+            params={"stationDn": station_dn, "timeDim": 2,
+                    "queryTime": int(day0.timestamp() * 1000),
+                    "timeZone": 3, "timeZoneStr": "Europe/Kiev", "_": _now_ms()},
+        )
+        d = r.json().get("data", {}) or {}
+        xs, pv, load = d.get("xAxis", []), d.get("productPower", []), d.get("usePower", [])
+        out = []
+        for i, t in enumerate(xs):
+            p = pv[i] if i < len(pv) else None
+            l = load[i] if i < len(load) else None
+            out.append({
+                "t": t[-5:],
+                "pv": round(float(p), 2) if p not in ("--", None, "") else None,
+                "load": round(float(l), 2) if l not in ("--", None, "") else None,
+            })
+        return out
 
     def get_station_price(self, station_dn: str) -> dict:
         """Configured tariff plan names (purchase / feed-in)."""

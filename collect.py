@@ -64,6 +64,9 @@ def collect():
             today = _safe(region.get_energy_today, dn, default={}); time.sleep(0.4)
             rec["metered"] = bool(today.get("metered"))
             rec["today"] = today
+            if rec["metered"]:
+                rec["today_overlap"] = _safe(region.get_today_balance, dn, default=[])
+                time.sleep(0.4)
 
             # today's PV power curve: sum inverter active-power signals
             devices = _safe(region.get_inverters, dn)
