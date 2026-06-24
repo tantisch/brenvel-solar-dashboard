@@ -89,6 +89,24 @@ def collect():
             stations.append(rec)
             time.sleep(0.5)
 
+    # --- Photomate / NetEco plants (separate platform: Кролевець, Жорнава) ---
+    ne_user, ne_pw = os.environ.get("NETECO_USER"), os.environ.get("NETECO_PASSWORD")
+    if ne_user and ne_pw:
+        try:
+            from neteco import get_neteco_stations
+            for p in get_neteco_stations(ne_user, ne_pw):
+                p.update({
+                    "today": {"metered": False, "pv": p["today_kwh"]},
+                    "today_rev": None, "today_curve": [],
+                    "daily": [], "monthly": [], "yearly": [],
+                    "price": {}, "n_inverters": p.get("device_num", 0), "alarms": [],
+                })
+                stations.append(p)
+                print(f"   • {p['name']} (NetEco) now={p['now_kw']}kW today={p['today_kwh']}kWh "
+                      f"total={p['total_kwh']/1e6:.1f}GWh")
+        except Exception as e:
+            print(f"   ! NetEco collection failed: {type(e).__name__}: {str(e)[:90]}")
+
     bundle = {"updated": now.strftime("%Y-%m-%d %H:%M"), "tz": "Europe/Kyiv",
               "stations": stations}
     os.makedirs("output", exist_ok=True)

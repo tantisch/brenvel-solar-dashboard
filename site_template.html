@@ -89,6 +89,7 @@ const fmt=(n,d=0)=>(n==null||isNaN(n))?'–':Number(n).toLocaleString('uk-UA',{m
 const short=n=>n.replace('Brenvel_','').replace('Brenvei_','');
 const stCol=s=>(ST[s]||ST.unknown)[0], stLbl=s=>(ST[s]||ST.unknown)[1];
 const cap=s=>s.nominal_kw>0?fmt(s.nominal_kw)+' кВт':'—';
+const noHist=s=>!(s.daily&&s.daily.length);  // NetEco/Photomate: live snapshot only
 let charts=[]; const clearCharts=()=>{charts.forEach(c=>c.destroy());charts=[];};
 let RANGE={key:'30d'}, curView=-1;
 
@@ -203,19 +204,52 @@ function scard(s,i,a,R){
     <div class="top"><div class="nm">${s.name} · ${cap(s)}</div><div class="badge" style="background:${c}">${stLbl(s.status)}</div></div>
     <div class="now">${fmt(s.now_kw,1)}<u> кВт зараз</u></div>
     <div class="mini">
+      ${noHist(s)?`
+      <div><div class="l">Сьогодні</div><div class="x">${fmt(s.today_kwh)} кВт·г</div></div>
+      <div><div class="l">Всього</div><div class="x">${fmt(s.total_kwh/1e6,2)} ГВт·г</div></div>
+      <div><div class="l">Дохід (всього)</div><div class="x">€${fmt(s.total_rev)}</div></div>
+      <div><div class="l">Пристроїв</div><div class="x">${s.device_num||'—'}</div></div>`:`
       <div><div class="l">Генерація (${R.title})</div><div class="x">${fmt(a.tot.pv)} кВт·г</div></div>
       <div><div class="l">Дохід</div><div class="x">€${fmt(a.tot.rev)}</div></div>
       ${s.metered?`<div><div class="l">Споживання</div><div class="x">${fmt(a.tot.load)} кВт·г</div></div>
       <div><div class="l">Самозабезпечення</div><div class="x">${a.tot.load?Math.round(a.tot.selfuse/a.tot.load*100):0}%</div></div>`:
       `<div><div class="l">Лічильник</div><div class="x" style="color:#94a3b8">немає</div></div>
-      <div><div class="l">Пік сьогодні</div><div class="x">${fmt(Math.max(0,...s.today_curve.map(p=>p.kw||0)),1)} кВт</div></div>`}
+      <div><div class="l">Пік сьогодні</div><div class="x">${fmt(Math.max(0,...s.today_curve.map(p=>p.kw||0)),1)} кВт</div></div>`}`}
     </div></div>`;
 }
 
 /* ---------- STATION ---------- */
+function stationLive(s){
+  const c=stCol(s.status);
+  const mapUrl=(s.lat&&s.lon)?`https://www.google.com/maps?q=${s.lat},${s.lon}`:null;
+  document.getElementById('view').innerHTML=`
+    <div class="dhead">
+      <div><div class="h1"><span style="width:13px;height:13px;border-radius:50%;background:${c};display:inline-block"></span>${s.name}
+        <span style="font-size:15px;color:#94a3b8;font-weight:600">· ${cap(s)} встановлено</span></div>
+        <div class="addr">📍 ${s.address||'—'}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="pill" style="color:${c}">● ${stLbl(s.status)}</span>
+        <span class="pill">Система: Photomate</span>
+        <span class="pill">Пристроїв: ${s.device_num||'—'}</span>
+      </div>
+    </div>
+    <div class="note">ℹ️ Це станція системи <b>Photomate (NetEco)</b>. Показано дані наживо та підсумки за весь час. Детальна історія (графіки по днях/місяцях, як у станцій Brenvel) для цієї системи ще додається.</div>
+    <div class="kpis">
+      ${kpi('Потужність зараз',fmt(s.now_kw,1),'кВт')}
+      ${kpi('Генерація сьогодні',fmt(s.today_kwh),'кВт·год',null,1)}
+      ${kpi('Встановлено',fmt(s.nominal_kw),'кВт')}
+      ${kpi('Завантаженість',s.nominal_kw?Math.round(s.now_kw/s.nominal_kw*100)+' %':'—','','зараз')}
+      ${kpi('Всього вироблено',fmt(s.total_kwh/1e6,2),'ГВт·год')}
+      ${kpi('Дохід за весь час','€'+fmt(s.total_rev),'')}
+    </div>
+    <h2 class="sec">Аварії</h2>
+    <div class="panel"><div class="ok">✓ Немає активних аварій</div></div>`;
+}
 function station(i){
   clearCharts();
-  const s=S[i], c=stCol(s.status), R=resolveRange(), a=agg(s,R), t=a.tot;
+  const s=S[i];
+  if(noHist(s)) return stationLive(s);
+  const c=stCol(s.status), R=resolveRange(), a=agg(s,R), t=a.tot;
   const td=s.today||{}, peak=Math.max(0,...s.today_curve.map(p=>p.kw||0));
   const mapUrl=(s.lat&&s.lon)?`https://www.google.com/maps?q=${s.lat},${s.lon}`:null;
   const epv=t.pv?'€'+fmt(t.rev/t.pv,3)+'/кВт·год':'—';
@@ -293,7 +327,7 @@ function renderNav(active){
 }
 function go(i){curView=i;renderNav(i);window.scrollTo({top:0,behavior:'smooth'});i<0?overview():station(i);}
 document.getElementById('upd').textContent='Оновлено '+DATA.updated;
-document.getElementById('foot').innerHTML='Автоматично з FusionSolar · '+DATA.updated+' ('+(DATA.tz||'')+') · оновлюється кожні 30 хв';
+document.getElementById('foot').innerHTML='Автоматично з FusionSolar + Photomate · '+DATA.updated+' ('+(DATA.tz||'')+')';
 renderNav(-1); overview();
 </script>
 </body>
