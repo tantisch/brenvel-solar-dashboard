@@ -90,6 +90,7 @@ const short=n=>n.replace('Brenvel_','').replace('Brenvei_','');
 const stCol=s=>(ST[s]||ST.unknown)[0], stLbl=s=>(ST[s]||ST.unknown)[1];
 const cap=s=>s.nominal_kw>0?fmt(s.nominal_kw)+' кВт':'—';
 const noHist=s=>!(s.daily&&s.daily.length);  // NetEco/Photomate: live snapshot only
+const hasRev=s=>(s.daily||[]).some(d=>d.rev!=null);  // NetEco history has generation, no per-period revenue
 let charts=[]; const clearCharts=()=>{charts.forEach(c=>c.destroy());charts=[];};
 let RANGE={key:'30d'}, curView=-1;
 
@@ -210,7 +211,7 @@ function scard(s,i,a,R){
       <div><div class="l">Дохід (всього)</div><div class="x">€${fmt(s.total_rev)}</div></div>
       <div><div class="l">Пристроїв</div><div class="x">${s.device_num||'—'}</div></div>`:`
       <div><div class="l">Генерація (${R.title})</div><div class="x">${fmt(a.tot.pv)} кВт·г</div></div>
-      <div><div class="l">Дохід</div><div class="x">€${fmt(a.tot.rev)}</div></div>
+      <div><div class="l">${hasRev(s)?'Дохід':'Дохід (всього)'}</div><div class="x">€${fmt(hasRev(s)?a.tot.rev:(s.total_rev||0))}</div></div>
       ${s.metered?`<div><div class="l">Споживання</div><div class="x">${fmt(a.tot.load)} кВт·г</div></div>
       <div><div class="l">Самозабезпечення</div><div class="x">${a.tot.load?Math.round(a.tot.selfuse/a.tot.load*100):0}%</div></div>`:
       `<div><div class="l">Лічильник</div><div class="x" style="color:#94a3b8">немає</div></div>
@@ -291,15 +292,15 @@ function station(i){
       ${s.metered?kpi('Віддано в мережу',fmt(t.export),'кВт·год','надлишок ПВ'):''}
       ${s.metered?kpi('Куплено з мережі',fmt(t.imp),'кВт·год','імпорт'):''}
       ${s.metered?kpi('Самозабезпечення',t.load?Math.round(t.selfuse/t.load*100):'—','%','навантаження з ПВ'):''}
-      ${kpi('Дохід',' €'+fmt(t.rev),'',R.title)}
-      ${kpi('Сер. ціна',epv,'','дохід / генерацію')}
+      ${hasRev(s)?kpi('Дохід',' €'+fmt(t.rev),'',R.title):kpi('Дохід за весь час',' €'+fmt(s.total_rev||0),'')}
+      ${hasRev(s)?kpi('Сер. ціна',epv,'','дохід / генерацію'):kpi('Пристроїв',s.n_inverters||s.device_num||'—','')}
     </div>
     ${!s.metered?`<div class="note">ℹ️ На цій станції не встановлено лічильник споживання — дані про навантаження, імпорт і експорт у мережу недоступні у FusionSolar. Показано генерацію та дохід.</div>`:''}
     <div class="charts">
       ${s.metered?`<div class="panel full"><h3>Генерація проти споживання</h3><div class="sub">${R.title} · кВт·год</div><div class="cwrap"><canvas id="dGenLoad"></canvas></div></div>`:
         `<div class="panel full"><h3>Генерація ПВ</h3><div class="sub">${R.title} · кВт·год</div><div class="cwrap"><canvas id="dGenLoad"></canvas></div></div>`}
       ${s.metered?`<div class="panel"><h3>Обмін з мережею</h3><div class="sub">імпорт vs експорт · кВт·год</div><div class="cwrap"><canvas id="dGrid"></canvas></div></div>`:''}
-      <div class="panel"><h3>Дохід</h3><div class="sub">${R.title} · €</div><div class="cwrap"><canvas id="dRev"></canvas></div></div>
+      ${hasRev(s)?`<div class="panel"><h3>Дохід</h3><div class="sub">${R.title} · €</div><div class="cwrap"><canvas id="dRev"></canvas></div></div>`:''}
       ${s.metered?`<div class="panel"><h3>Куди пішла генерація</h3><div class="sub">самоспоживання vs експорт</div><div class="cwrap sm"><canvas id="dDoGen"></canvas></div></div>
       <div class="panel"><h3>Звідки спожито</h3><div class="sub">від ПВ vs з мережі</div><div class="cwrap sm"><canvas id="dDoUse"></canvas></div></div>`:''}
     </div>
@@ -312,7 +313,7 @@ function station(i){
   if(s.metered) bars('dGenLoad',L,[{l:'Генерація ПВ',d:a.data.map(d=>d.pv),c:C.pv},{l:'Споживання',d:a.data.map(d=>d.load),c:C.load}]);
   else bars('dGenLoad',L,[{l:'Генерація ПВ',d:a.data.map(d=>d.pv),c:C.pv}]);
   if(s.metered) bars('dGrid',L,[{l:'З мережі',d:a.data.map(d=>d.imp),c:C.imp},{l:'У мережу',d:a.data.map(d=>d.export),c:C.export}]);
-  bars('dRev',L,[{l:'Дохід',d:a.data.map(d=>d.rev),c:C.rev}],'€');
+  if(hasRev(s)) bars('dRev',L,[{l:'Дохід',d:a.data.map(d=>d.rev),c:C.rev}],'€');
   if(s.metered){
     donut('dDoGen',['Самоспоживання','Експорт у мережу'],[t.selfuse||0,t.export||0],['#16a34a','#f59e0b']);
     donut('dDoUse',['Від ПВ','З мережі'],[t.selfuse||0,t.imp||0],['#16a34a','#ef4444']);

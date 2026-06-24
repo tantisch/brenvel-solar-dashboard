@@ -93,17 +93,22 @@ def collect():
     ne_user, ne_pw = os.environ.get("NETECO_USER"), os.environ.get("NETECO_PASSWORD")
     if ne_user and ne_pw:
         try:
-            from neteco import get_neteco_stations
-            for p in get_neteco_stations(ne_user, ne_pw):
+            from neteco import NetEcoClient
+            ne = NetEcoClient(ne_user, ne_pw).login()
+            for p in ne.get_plants():
+                node = p["dn"].replace("neteco-", "")
+                hist = _safe(ne.get_plant_history, node, default={})
                 p.update({
                     "today": {"metered": False, "pv": p["today_kwh"]},
-                    "today_rev": None, "today_curve": [],
-                    "daily": [], "monthly": [], "yearly": [],
-                    "price": {}, "n_inverters": p.get("device_num", 0), "alarms": [],
+                    "today_rev": None, "price": {},
+                    "n_inverters": p.get("device_num", 0), "alarms": [],
+                    "daily": hist.get("daily", []), "monthly": hist.get("monthly", []),
+                    "yearly": hist.get("yearly", []), "today_curve": hist.get("today_curve", []),
                 })
                 stations.append(p)
-                print(f"   • {p['name']} (NetEco) now={p['now_kw']}kW today={p['today_kwh']}kWh "
-                      f"total={p['total_kwh']/1e6:.1f}GWh")
+                print(f"   • {p['name']} (NetEco) now={p['now_kw']}kW daily={len(p['daily'])} "
+                      f"monthly={len(p['monthly'])} yearly={len(p['yearly'])} curve={len(p['today_curve'])}")
+                time.sleep(0.4)
         except Exception as e:
             print(f"   ! NetEco collection failed: {type(e).__name__}: {str(e)[:90]}")
 

@@ -11,9 +11,15 @@ this adapter returns the reliable live snapshot only.
 """
 import re
 import html
+import json
+import time as _time
+from datetime import datetime, timedelta, timezone
+
 import requests
 
 BASE = "https://neteco.photomate.eu/"
+PERF = BASE + "performance!performance_sun_topage.action"
+_TZ = timezone(timedelta(hours=3))   # plants report in UTC+3 (Minsk)
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
 
@@ -112,6 +118,71 @@ class NetEcoClient:
                 "lat": None, "lon": None, "connected": "",
             })
         return out
+
+    def _stat_rows(self, ep, node_sn, time_con):
+        """Call a summaryAction power-stat endpoint and return its rows."""
+        r = self.s.post(
+            BASE + "summaryAction!" + ep,
+            data={"systemPowerDayCon": time_con, "nodeSN": node_sn,
+                  "isperformanceRaion": "false", "isstringPower": "false"},
+            headers={"X-Requested-With": "XMLHttpRequest", "Referer": PERF}, timeout=30,
+        )
+        j = r.json()
+        key = next((k for k in j if k.startswith("systemPower") and k != "systemPowerDayCon"), None)
+        if not key:
+            return []
+        try:
+            arr = json.loads(j[key])
+            return arr[0] if arr and isinstance(arr[0], list) else arr
+        except Exception:
+            return []
+
+    def get_plant_history(self, node_sn, n_months=8, n_years=4) -> dict:
+        """Generation history: daily (last n_months), monthly (last n_years),
+        yearly (all), and today's intraday power curve."""
+        self.s.get(PERF, timeout=30)   # establish performance-page context
+        now = datetime.now(_TZ)
+
+        daily, y, m = [], now.year, now.month
+        for _ in range(n_months):
+            ym = f"{y:04d}-{m:02d}"
+            for row in self._stat_rows("querySystemPowerStatMonth.action", node_sn, ym):
+                e = _num(row[1], None) if len(row) > 1 else None
+                if e is not None:
+                    daily.append({"label": f"{ym}-{int(row[0]):02d}", "pv": round(e, 1)})
+            m -= 1
+            if m == 0:
+                m = 12; y -= 1
+            _time.sleep(0.25)
+        daily.sort(key=lambda r: r["label"])
+
+        monthly = []
+        for yr in range(now.year, now.year - n_years, -1):
+            for row in self._stat_rows("querySystemPowerStatYear.action", node_sn, str(yr)):
+                e = _num(row[1], None) if len(row) > 1 else None
+                if e is not None:
+                    monthly.append({"label": f"{yr}-{int(row[0]):02d}", "pv": round(e, 1)})
+            _time.sleep(0.25)
+        monthly.sort(key=lambda r: r["label"])
+
+        yearly = []
+        for row in self._stat_rows("querySystemPowerStatTotal.action", node_sn, ""):
+            e = _num(row[1], None) if len(row) > 1 else None
+            if e is not None:
+                yearly.append({"label": str(row[0]).strip(), "pv": round(e, 1)})
+        yearly.sort(key=lambda r: r["label"])
+
+        curve, nown = [], now.replace(tzinfo=None)
+        for row in self._stat_rows("querySystemPowerStatDay.action", node_sn, now.strftime("%Y-%m-%d")):
+            try:
+                dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
+            except (ValueError, TypeError):
+                continue
+            kw = _num(row[1], None)
+            if dt <= nown and kw is not None:
+                curve.append({"t": dt.strftime("%H:%M"), "kw": round(kw, 2)})
+
+        return {"daily": daily, "monthly": monthly, "yearly": yearly, "today_curve": curve}
 
 
 def get_neteco_stations(username: str, password: str) -> list:
