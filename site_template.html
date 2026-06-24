@@ -262,6 +262,7 @@ function station(i){
   if(noHist(s)) return stationLive(s);
   const c=stCol(s.status), R=resolveRange(), a=agg(s,R), t=a.tot;
   const td=s.today||{}, peak=Math.max(0,...s.today_curve.map(p=>p.kw||0));
+  const overlap=s.metered&&s.today_overlap&&s.today_overlap.some(p=>p.pv!=null||p.load!=null);
   const mapUrl=(s.lat&&s.lon)?`https://www.google.com/maps?q=${s.lat},${s.lon}`:null;
   const epv=t.pv?'€'+fmt(t.rev/t.pv,3)+'/кВт·год':'—';
   const v=document.getElementById('view');
@@ -291,7 +292,12 @@ function station(i){
       ${s.metered?kpi('У мережу сьогодні',fmt(td.export),'кВт·год','надлишок'):''}
       ${s.metered?kpi('З мережі сьогодні',fmt(td.imp),'кВт·год','імпорт'):''}
     </div>
-    <div class="panel full"><h3>${(s.metered&&s.today_overlap&&s.today_overlap.length)?'Генерація ПВ та споживання — сьогодні':'Потужність ПВ сьогодні'}</h3><div class="sub">кВт · крок 5 хв · повний день, прогалини — немає даних</div>
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div><h3>${overlap?'Генерація ПВ та споживання — сьогодні':'Потужність ПВ сьогодні'}</h3>
+          <div class="sub">кВт · крок 5 хв · повний день, прогалини — немає даних</div></div>
+        ${overlap?`<label style="font-size:13px;color:#475569;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap"><input type="checkbox" checked onchange="toggleLoad(this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:#64748b"> показувати споживання</label>`:''}
+      </div>
       <div class="cwrap tall"><canvas id="dCurve"></canvas></div></div>
 
     <h2 class="sec">Аналіз за період</h2>
@@ -318,7 +324,7 @@ function station(i){
     <h2 class="sec">Аварії</h2>
     <div class="panel">${(s.alarms&&s.alarms.length)?s.alarms.map(al=>`<div class="alert" style="margin:0 0 8px">⚠️ <b>${al.name}</b>${al.device?' — '+al.device:''}</div>`).join(''):'<div class="ok">✓ Немає активних аварій</div>'}</div>`;
 
-  if(s.metered&&s.today_overlap&&s.today_overlap.some(p=>p.pv!=null||p.load!=null))
+  if(overlap)
     lines('dCurve',s.today_overlap.map(p=>p.t),[{l:'Генерація ПВ',d:s.today_overlap.map(p=>p.pv),c:'#16a34a'},{l:'Споживання',d:s.today_overlap.map(p=>p.load),c:'#64748b'}]);
   else if(s.today_curve.some(p=>p.kw!=null)) line('dCurve',s.today_curve.map(p=>p.t),s.today_curve.map(p=>p.kw),c);
   else noData('dCurve','Немає даних за сьогодні (станція офлайн)');
@@ -333,6 +339,7 @@ function station(i){
   }
 }
 function noData(id,msg){const c=document.getElementById(id);if(c)c.parentElement.innerHTML=`<div style="display:flex;height:100%;align-items:center;justify-content:center;color:#94a3b8;font-size:14px">${msg}</div>`;}
+function toggleLoad(show){const ch=charts.find(c=>c.canvas&&c.canvas.id==='dCurve');if(ch){ch.setDatasetVisibility(1,show);ch.update();}}
 
 /* ---------- nav ---------- */
 function renderNav(active){
