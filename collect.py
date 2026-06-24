@@ -96,19 +96,22 @@ def collect():
             from neteco import NetEcoClient
             ne = NetEcoClient(ne_user, ne_pw).login()
             for p in ne.get_plants():
-                node = p["dn"].replace("neteco-", "")
-                hist = _safe(ne.get_plant_history, node, default={})
-                p.update({
-                    "today": {"metered": False, "pv": p["today_kwh"]},
-                    "today_rev": None, "price": {},
-                    "n_inverters": p.get("device_num", 0), "alarms": [],
-                    "daily": hist.get("daily", []), "monthly": hist.get("monthly", []),
-                    "yearly": hist.get("yearly", []), "today_curve": hist.get("today_curve", []),
-                })
-                stations.append(p)
-                print(f"   • {p['name']} (NetEco) now={p['now_kw']}kW daily={len(p['daily'])} "
-                      f"monthly={len(p['monthly'])} yearly={len(p['yearly'])} curve={len(p['today_curve'])}")
-                time.sleep(0.4)
+                try:
+                    node = p["dn"].replace("neteco-", "")
+                    hist = _safe(ne.get_plant_history, node, default={})
+                    p.update({
+                        "today": {"metered": False, "pv": p["today_kwh"]},
+                        "today_rev": None, "price": {},
+                        "n_inverters": p.get("device_num", 0), "alarms": [],
+                        "daily": hist.get("daily", []), "monthly": hist.get("monthly", []),
+                        "yearly": hist.get("yearly", []), "today_curve": hist.get("today_curve", []),
+                    })
+                    stations.append(p)   # always keep the plant (history is best-effort)
+                    print(f"   • {p['name']} (NetEco) now={p['now_kw']}kW daily={len(p['daily'])} "
+                          f"monthly={len(p['monthly'])} yearly={len(p['yearly'])} curve={len(p['today_curve'])}")
+                    time.sleep(0.4)
+                except Exception as e:
+                    print(f"   ! NetEco plant {p.get('name')} failed: {type(e).__name__}: {str(e)[:60]}")
         except Exception as e:
             print(f"   ! NetEco collection failed: {type(e).__name__}: {str(e)[:90]}")
 

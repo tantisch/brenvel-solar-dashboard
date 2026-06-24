@@ -55,26 +55,38 @@ class NetEcoClient:
         self.s.headers["User-Agent"] = UA
         self._csrf_header = None
 
+    def _req(self, method, url, retries=2, **kw):
+        """Request with retries — neteco.photomate.eu can be slow from CI."""
+        kw.setdefault("timeout", 45)
+        last = None
+        for attempt in range(retries + 1):
+            try:
+                return self.s.request(method, url, **kw)
+            except (requests.Timeout, requests.ConnectionError) as e:
+                last = e
+                if attempt < retries:
+                    _time.sleep(1.5 * (attempt + 1))
+        raise last
+
     def login(self):
-        html_page = self.s.get(BASE + "index.action", timeout=30).text
+        html_page = self._req("GET", BASE + "index.action").text
         token = re.search(r'name="_csrf"\s+content="([^"]*)"', html_page)
         header = re.search(r'name="_csrf_header"\s+content="([^"]*)"', html_page)
         if not token or not header:
             raise NetEcoError("could not read login CSRF token")
         self.s.headers[header.group(1)] = token.group(1)
-        r = self.s.post(
-            BASE + "security!login.action",
+        r = self._req(
+            "POST", BASE + "security!login.action",
             data={"userName": self.username, "password": self.password,
                   "dateTime": "0", "veryCode": "", "webLang": "en_US"},
             headers={"X-Requested-With": "XMLHttpRequest", "Referer": BASE + "index.action"},
-            timeout=30,
         )
         if r.json().get("retMsg") != "op.successfully":
             raise NetEcoError(f"login failed: {r.text[:120]}")
         # complete login, then refresh the (rotated) CSRF token from an
         # authenticated page so data calls are accepted
-        self.s.get(BASE + "securitys!tologin.action", timeout=30)
-        ov = self.s.get(BASE + "overviewAction!toPvPlantOverviewMain.action", timeout=30).text
+        self._req("GET", BASE + "securitys!tologin.action")
+        ov = self._req("GET", BASE + "overviewAction!toPvPlantOverviewMain.action").text
         nt = re.search(r'name="_csrf"\s+content="([^"]*)"', ov)
         nh = re.search(r'name="_csrf_header"\s+content="([^"]*)"', ov)
         if nt and nh:
@@ -85,13 +97,12 @@ class NetEcoClient:
 
     def get_plants(self) -> list:
         """Return the live plant list as normalized records."""
-        r = self.s.post(
-            BASE + "sunmonitorjson!queryPlantListInfo.action",
+        r = self._req(
+            "POST", BASE + "sunmonitorjson!queryPlantListInfo.action",
             data={"groupName": "", "_search": "false", "page": 1, "rows": 100,
                   "sidx": "", "sord": "asc"},
             headers={"X-Requested-With": "XMLHttpRequest",
                      "Referer": BASE + "overviewAction!toPvPlantOverviewMain.action"},
-            timeout=30,
         )
         data = r.json()
         out = []
@@ -120,18 +131,19 @@ class NetEcoClient:
         return out
 
     def _stat_rows(self, ep, node_sn, time_con):
-        """Call a summaryAction power-stat endpoint and return its rows."""
-        r = self.s.post(
-            BASE + "summaryAction!" + ep,
-            data={"systemPowerDayCon": time_con, "nodeSN": node_sn,
-                  "isperformanceRaion": "false", "isstringPower": "false"},
-            headers={"X-Requested-With": "XMLHttpRequest", "Referer": PERF}, timeout=30,
-        )
-        j = r.json()
-        key = next((k for k in j if k.startswith("systemPower") and k != "systemPowerDayCon"), None)
-        if not key:
-            return []
+        """Call a summaryAction power-stat endpoint; return rows ([] on any error)."""
         try:
+            r = self._req(
+                "POST", BASE + "summaryAction!" + ep,
+                data={"systemPowerDayCon": time_con, "nodeSN": node_sn,
+                      "isperformanceRaion": "false", "isstringPower": "false"},
+                headers={"X-Requested-With": "XMLHttpRequest", "Referer": PERF},
+                timeout=15, retries=0,
+            )
+            j = r.json()
+            key = next((k for k in j if k.startswith("systemPower") and k != "systemPowerDayCon"), None)
+            if not key:
+                return []
             arr = json.loads(j[key])
             return arr[0] if arr and isinstance(arr[0], list) else arr
         except Exception:
@@ -140,7 +152,10 @@ class NetEcoClient:
     def get_plant_history(self, node_sn, n_months=8, n_years=4) -> dict:
         """Generation history: daily (last n_months), monthly (last n_years),
         yearly (all), and today's intraday power curve."""
-        self.s.get(PERF, timeout=30)   # establish performance-page context
+        try:
+            self._req("GET", PERF)   # establish performance-page context
+        except Exception:
+            pass
         now = datetime.now(_TZ)
 
         daily, y, m = [], now.year, now.month
