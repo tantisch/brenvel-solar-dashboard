@@ -1,4 +1,8 @@
 {
   "uah_per_eur": 52.0,
-  "stations": {}
+  "stations": {
+    "Кролевець": {
+      "eur_mwh": 120.0
+    }
+  }
 }
