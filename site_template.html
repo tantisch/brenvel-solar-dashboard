@@ -187,12 +187,8 @@ let PRICES_OPEN=false;
 /* income for pvKwh (with known EUR revenue) for a station, in the active currency */
 function incomeOf(s,pvKwh,eurRev){
   pvKwh=pvKwh||0; const p=(s&&s.pr)||{};
-  if(p.custom){
-    const eur=(p.eur>0)?pvKwh*p.eur/1000:(eurRev||0);
-    if(CUR==='₴') return (p.uah>0)?pvKwh*p.uah/1000:eur*FX;
-    return eur;
-  }
-  return CUR==='₴'?(eurRev||0)*FX:(eurRev||0);
+  const eur=(p.custom&&p.eur>0)?pvKwh*p.eur/1000:(eurRev||0);  // € from your price or system
+  return CUR==='₴'?eur*FX:eur;                                  // ₴ = € × rate
 }
 function money(v){v=v||0; return CUR+(v>=1e6?fmt(v/1e6,2)+' млн':fmt(v));}
 function inc(r){return `<b style="color:#15803d;font-weight:800;font-size:14px">${money(r)}</b> <span style="color:#94a3b8">дохід</span>`;}
@@ -288,44 +284,47 @@ function overview(){
 }
 /* ---------- price editor (per-MWh tariff; shared via GitHub) ---------- */
 function pricesPanel(){
-  const rows=S.map((s,i)=>`<tr>
+  const rows=S.map((s,i)=>{const eff=(s.pr.custom&&s.pr.eur)?s.pr.eur:s.pr.def_eur; return `<tr>
     <td class="pn">${s.name}</td>
     <td class="pd">${fmt(s.pr.def_eur,0)} €<div class="pdh">за замовч., €/МВт·г</div></td>
-    <td><input id="pe${i}" type="number" min="0" step="1" inputmode="decimal" placeholder="${fmt(s.pr.def_eur,0)}" value="${s.pr.custom&&s.pr.eur?s.pr.eur:''}"> <small style="color:#94a3b8">€</small></td>
-    <td><input id="pu${i}" type="number" min="0" step="1" inputmode="decimal" placeholder="${fmt(Math.round(s.pr.def_eur*FX),0)}" value="${s.pr.custom&&s.pr.uah?s.pr.uah:''}"> <small style="color:#94a3b8">₴</small></td>
-  </tr>`).join('');
+    <td><input id="pe${i}" type="number" min="0" step="1" inputmode="decimal" oninput="recalcUah(${i})" placeholder="${fmt(s.pr.def_eur,0)}" value="${s.pr.custom&&s.pr.eur?s.pr.eur:''}"> <small style="color:#94a3b8">€</small></td>
+    <td class="pd"><span id="pu${i}">${fmt(Math.round(eff*FX),0)}</span> ₴<div class="pdh">= € × курс</div></td>
+  </tr>`;}).join('');
   return `<details class="prices" ${PRICES_OPEN?'open':''} ontoggle="PRICES_OPEN=this.open">
-    <summary>⚙️ Тарифи та дохід — задати ціну за МВт·год (€ і ₴) для кожної станції</summary>
+    <summary>⚙️ Тарифи та дохід — ціна €/МВт·год для кожної станції (гривня рахується за курсом)</summary>
     <div class="pbody">
-      <div class="prow"><label>Курс ₴ за 1 €</label><input id="fxin" type="number" min="0" step="0.1" inputmode="decimal" value="${FX}" style="width:92px"></div>
-      <div style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Станція</th><th class="thd">Базова ціна</th><th>Ваша ціна €/МВт·год</th><th>Ваша ціна ₴/МВт·год</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="prow"><label>Курс ₴ за 1 €</label><input id="fxin" type="number" min="0" step="0.1" inputmode="decimal" oninput="recalcAllUah()" value="${FX}" style="width:92px"></div>
+      <div style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Станція</th><th class="thd">Базова ціна</th><th>Ваша ціна €/МВт·год</th><th class="thd">₴/МВт·год (авто)</th></tr></thead><tbody>${rows}</tbody></table></div>
       <div class="pacts">
         <button class="rb on" onclick="applyPrices()">Застосувати (перегляд)</button>
         <button class="rb" onclick="savePrices()">💾 Зберегти для всіх (GitHub)</button>
         <button class="rb" onclick="resetPrices()">Скинути</button>
       </div>
-      <div class="phint"><b>«Застосувати»</b> — перерахунок доходу лише у вашому браузері (для прикидки). <b>«Зберегти для всіх»</b> — відкриє GitHub, де ціна збережеться <b>назавжди і для всіх</b>; дашборд оновиться за ~2 хв (потрібен вхід у GitHub із доступом до репозиторію). Порожнє поле = базова ціна / дохід від системи. Перемикач <b>€ / ₴</b> угорі змінює валюту всіх сум доходу.</div>
+      <div class="phint">Вводьте лише ціну в <b>€/МВт·год</b> — гривня рахується автоматично як <b>€ × курс</b>. <b>«Застосувати»</b> — перерахунок доходу лише у вашому браузері (для прикидки). <b>«Зберегти для всіх»</b> — відкриє GitHub, де ціна збережеться <b>назавжди і для всіх</b>; дашборд оновиться за ~1–2 хв (потрібен вхід у GitHub із доступом до репозиторію). Порожнє поле = базова ціна / дохід від системи. Перемикач <b>€ / ₴</b> угорі змінює валюту всіх сум доходу.</div>
     </div></details>`;
 }
+function recalcUah(i){
+  const fx=parseFloat((document.getElementById('fxin')||{}).value)||FX;
+  const e=parseFloat((document.getElementById('pe'+i)||{}).value);
+  const eff=e>0?e:S[i].pr.def_eur;
+  const span=document.getElementById('pu'+i); if(span)span.textContent=fmt(Math.round(eff*fx),0);
+}
+function recalcAllUah(){ S.forEach((s,i)=>recalcUah(i)); }
 function applyPrices(){
   const fx=parseFloat((document.getElementById('fxin')||{}).value); if(fx>0)FX=fx;
   S.forEach((s,i)=>{
     const e=parseFloat((document.getElementById('pe'+i)||{}).value);
-    const u=parseFloat((document.getElementById('pu'+i)||{}).value);
-    const hasE=e>0,hasU=u>0;
-    s.pr.custom=hasE||hasU; s.pr.eur=hasE?e:null; s.pr.uah=hasU?u:null;
+    s.pr.custom=e>0; s.pr.eur=e>0?e:null;
   });
   PRICES_OPEN=true; updateFxNote(); rerender();
 }
-function resetPrices(){ S.forEach(s=>{s.pr.custom=false;s.pr.eur=null;s.pr.uah=null;}); PRICES_OPEN=true; rerender(); }
+function resetPrices(){ S.forEach(s=>{s.pr.custom=false;s.pr.eur=null;}); PRICES_OPEN=true; rerender(); }
 function savePrices(){
   const fx=parseFloat((document.getElementById('fxin')||{}).value)||FX;
   const stations={};
   S.forEach((s,i)=>{
     const e=parseFloat((document.getElementById('pe'+i)||{}).value);
-    const u=parseFloat((document.getElementById('pu'+i)||{}).value);
-    const ent={}; if(e>0)ent.eur_mwh=e; if(u>0)ent.uah_mwh=u;
-    if(Object.keys(ent).length) stations[s.name]=ent;
+    if(e>0) stations[s.name]={eur_mwh:e};
   });
   const obj={uah_per_eur:fx,stations};
   const body='Збереження тарифів для всіх станцій. Бот застосує автоматично — **не редагуйте** JSON нижче вручну.\n\n```json\n'+JSON.stringify(obj,null,2)+'\n```\n\nПісля натискання «Submit new issue» ціни збережуться і дашборд оновиться за ~2 хв.';

@@ -56,13 +56,10 @@ jobs:
           for name, v in (obj.get("stations") or {}).items():
               if not isinstance(v, dict):
                   continue
-              ent = {}
-              for key in ("eur_mwh", "uah_mwh"):
-                  val = v.get(key)
-                  if isinstance(val, (int, float)) and 0 < val < 1_000_000:
-                      ent[key] = round(float(val), 2)
-              if ent:
-                  clean["stations"][str(name)[:80]] = ent
+              # only the EUR price per station is stored; ₴ is derived as € × fx
+              val = v.get("eur_mwh")
+              if isinstance(val, (int, float)) and 0 < val < 1_000_000:
+                  clean["stations"][str(name)[:80]] = {"eur_mwh": round(float(val), 2)}
           os.makedirs("config", exist_ok=True)
           with open("config/prices.json", "w", encoding="utf-8") as fh:
               json.dump(clean, fh, ensure_ascii=False, indent=2)

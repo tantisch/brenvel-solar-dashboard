@@ -51,13 +51,11 @@ def apply_prices(bundle, prices):
         name = s["name"]
         ov = overrides.get(name) or {}
         eur = ov.get("eur_mwh")
-        uah = ov.get("uah_mwh")
         eur = float(eur) if isinstance(eur, (int, float)) and eur > 0 else None
-        uah = float(uah) if isinstance(uah, (int, float)) and uah > 0 else None
+        # Only the EUR price per station is stored; ₴ income is derived as € × fx.
         s["pr"] = {
-            "custom": bool(eur or uah),
+            "custom": bool(eur),
             "eur": eur,
-            "uah": uah,
             "def_eur": defs.get(name) or fleet_def,
         }
 
