@@ -74,6 +74,7 @@
   .curtog{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
   .cbtn{border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:800;padding:5px 11px;cursor:pointer}
   .cbtn.on{background:var(--ink);color:#fff}
+  .fxnote{font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap;background:#fff;border:1px solid var(--line);border-radius:9px;padding:5px 10px}
   .prices{margin:26px 0 6px;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
   .prices>summary{cursor:pointer;padding:14px 18px;font-weight:700;font-size:14px;color:#334155;list-style:none;user-select:none;display:flex;align-items:center;gap:8px}
   .prices>summary::-webkit-details-marker{display:none}
@@ -117,7 +118,7 @@
 <header><div class="bar">
   <div class="brand">☀️ Сонячний парк Brenvel</div>
   <nav id="nav"></nav>
-  <div class="meta"><span class="curtog" id="curtog"><button class="cbtn on" data-c="€" onclick="setCur('€')">€</button><button class="cbtn" data-c="₴" onclick="setCur('₴')">₴</button></span><span id="upd"></span><span class="live"><span class="dot"></span>НАЖИВО</span></div>
+  <div class="meta"><span class="curtog" id="curtog"><button class="cbtn on" data-c="€" onclick="setCur('€')">€</button><button class="cbtn" data-c="₴" onclick="setCur('₴')">₴</button></span><span class="fxnote" id="fxnote" title="Поточний курс, за яким рахується дохід у гривні"></span><span id="upd"></span><span class="live"><span class="dot"></span>НАЖИВО</span></div>
 </div></header>
 <div class="wrap"><div id="view"></div><div class="foot" id="foot"></div></div>
 
@@ -314,7 +315,7 @@ function applyPrices(){
     const hasE=e>0,hasU=u>0;
     s.pr.custom=hasE||hasU; s.pr.eur=hasE?e:null; s.pr.uah=hasU?u:null;
   });
-  PRICES_OPEN=true; rerender();
+  PRICES_OPEN=true; updateFxNote(); rerender();
 }
 function resetPrices(){ S.forEach(s=>{s.pr.custom=false;s.pr.eur=null;s.pr.uah=null;}); PRICES_OPEN=true; rerender(); }
 function savePrices(){
@@ -469,6 +470,8 @@ function renderNav(active){
   document.getElementById('nav').innerHTML=items.map(([n,i])=>`<button class="tab ${active===i?'active':''}" onclick="go(${i})">${n}</button>`).join('');
 }
 function go(i){curView=i;renderNav(i);window.scrollTo({top:0,behavior:'smooth'});i<0?overview():station(i);}
+function updateFxNote(){const el=document.getElementById('fxnote'); if(el)el.textContent='1 € = '+fmt(FX,FX%1?2:0)+' ₴';}
+updateFxNote();
 document.getElementById('upd').textContent='Оновлено '+DATA.updated;
 document.getElementById('foot').innerHTML='Автоматично з FusionSolar + Photomate · '+DATA.updated+' ('+(DATA.tz||'')+')';
 renderNav(-1); overview();
