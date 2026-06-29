@@ -59,7 +59,10 @@
   .badge{font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;color:#fff;white-space:nowrap}
   .scard .now{font-size:28px;font-weight:800;margin:12px 0 0;letter-spacing:-1px}
   .scard .now u{font-size:13px;color:var(--faint);font-weight:700;font-style:normal}
-  .mini{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  .mini{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  .mini .x small{font-size:10.5px;color:var(--faint);font-weight:700}
+  .spark{height:62px;position:relative;margin-top:12px}
+  .spark .nospark{height:100%;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:11.5px;font-weight:600}
   .mini .l{font-size:10.5px;color:var(--faint);font-weight:700;text-transform:uppercase}
   .mini .x{font-size:14px;font-weight:700;margin-top:2px}
   .dhead{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:flex-start;margin:22px 0 4px}
@@ -98,7 +101,7 @@
 <script>
 const DATA=__DATA__, S=DATA.stations, TODAY=DATA.updated.slice(0,10);
 const ST={connected:['#16a34a','Онлайн'],disconnected:['#94a3b8','Офлайн'],trouble:['#f59e0b','Попередження'],unknown:['#94a3b8','Невідомо']};
-const COLORS=['#16a34a','#2563eb','#f59e0b','#8b5cf6','#ef4444','#06b6d4'];
+const COLORS=['#16a34a','#2563eb','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899'];
 const C={pv:'#16a34a',load:'#475569',selfuse:'#16a34a',export:'#f59e0b',imp:'#ef4444',rev:'#0ea5e9'};
 const fmt=(n,d=0)=>(n==null||isNaN(n))?'–':Number(n).toLocaleString('uk-UA',{minimumFractionDigits:d,maximumFractionDigits:d});
 const short=n=>n.replace('Brenvel_','').replace('Brenvei_','');
@@ -151,6 +154,10 @@ const lbl=(s,gran)=>gran==='daily'?s.slice(5):s;
 
 /* ---------- chart helpers ---------- */
 function kpi(k,v,u,s,acc){return `<div class="kpi${acc?' accent':''}"><div class="k">${k}</div><div class="v">${v}${u?` <span class="u">${u}</span>`:''}</div>${s?`<div class="s">${s}</div>`:''}</div>`;}
+function eScale(k){k=k||0; if(k>=1e6)return{v:fmt(k/1e6,1),u:'ГВт·год'}; if(k>=1e3)return{v:fmt(k/1e3,1),u:'МВт·год'}; return{v:fmt(k),u:'кВт·год'};}
+function cardE(k){const e=eScale(k); return `${e.v} <small>${e.u.replace('год','г')}</small>`;}
+function money(v){v=v||0; return '€'+(v>=1e6?fmt(v/1e6,2)+' млн':fmt(v));}
+function inc(r){return `<b style="color:#15803d;font-weight:800;font-size:14px">${money(r)}</b> <span style="color:#94a3b8">дохід</span>`;}
 const axMoney=v=>v>=1000?(v/1000)+'к':v;
 function bars(id,labels,sets,unit='кВт·год',stacked=false){
   const ctx=document.getElementById(id); if(!ctx)return;
@@ -188,60 +195,73 @@ function lines(id,labels,sets){
 }
 
 /* ---------- OVERVIEW ---------- */
+function sparkline(id,labels,data,color){
+  const ctx=document.getElementById(id); if(!ctx)return;
+  const peak=Math.max(0,...data.filter(x=>x!=null));
+  charts.push(new Chart(ctx,{type:'line',data:{labels,datasets:[{data,borderColor:color,
+    backgroundColor:color+'1f',borderWidth:1.6,fill:true,tension:.4,pointRadius:0,pointHoverRadius:3,spanGaps:false}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{intersect:false,mode:'index'},
+      plugins:{legend:{display:false},tooltip:{displayColors:false,callbacks:{title:c=>c[0].label,label:c=>` ${fmt(c.parsed.y,1)} кВт`}}},
+      scales:{x:{display:false},y:{display:false,beginAtZero:true,suggestedMax:peak*1.1||1}}}}));
+}
 function overview(){
   clearCharts();
   const R=resolveRange();
-  const per=S.map(s=>({s,a:agg(s,R)}));
-  const sum=k=>per.reduce((x,p)=>x+(p.a.tot[k]||0),0);
-  const metered=S.filter(s=>s.metered);
-  const t={pv:sum('pv'),rev:sum('rev'),
-    load:metered.reduce((x,s)=>x+(agg(s,R).tot.load||0),0),
-    imp:metered.reduce((x,s)=>x+(agg(s,R).tot.imp||0),0),
-    exp:metered.reduce((x,s)=>x+(agg(s,R).tot.export||0),0),
-    selfuse:metered.reduce((x,s)=>x+(agg(s,R).tot.selfuse||0),0)};
-  const liveNow=S.reduce((a,s)=>a+s.now_kw,0);
+  const TM=TODAY.slice(0,7), TY=TODAY.slice(0,4);
+  const fM=(s,l)=>(s.monthly||[]).find(x=>x.label===l);
+  const fY=(s,l)=>(s.yearly||[]).find(x=>x.label===l);
+  const tRev=s=>s.today_rev!=null?s.today_rev:((s.daily||[]).find(d=>d.label===TODAY)?.rev||0);
+  const sumY=(s,k)=>(s.yearly||[]).reduce((a,y)=>a+(y[k]||0),0);
+  const T={now:S.reduce((a,s)=>a+s.now_kw,0),
+    pvD:S.reduce((a,s)=>a+((s.today&&s.today.pv)||0),0), revD:S.reduce((a,s)=>a+tRev(s),0),
+    pvM:S.reduce((a,s)=>a+(fM(s,TM)?.pv||0),0),          revM:S.reduce((a,s)=>a+(fM(s,TM)?.rev||0),0),
+    pvY:S.reduce((a,s)=>a+(fY(s,TY)?.pv||0),0),          revY:S.reduce((a,s)=>a+(fY(s,TY)?.rev||0),0),
+    pvL:S.reduce((a,s)=>a+sumY(s,'pv'),0),               revL:S.reduce((a,s)=>a+sumY(s,'rev'),0)};
+  const online=S.filter(s=>s.status==='connected').length;
   const probs=S.filter(s=>s.status!=='connected');
+  const eM=eScale(T.pvM), eY=eScale(T.pvY), eL=eScale(T.pvL);
   const v=document.getElementById('view');
   v.innerHTML=`
-    ${rangeBar()}
     ${probs.length?`<div class="alert">⚠️ <b>Потребують уваги (${probs.length}):</b> ${probs.map(p=>short(p.name)+' ('+stLbl(p.status).toLowerCase()+')').join(', ')}</div>`:''}
     <div class="kpis">
-      ${kpi('Потужність зараз',fmt(liveNow,1),'кВт','по '+S.length+' станціях')}
-      ${kpi('Генерація ПВ',fmt(t.pv),'кВт·год',R.title,1)}
-      ${kpi('Дохід',' €'+fmt(t.rev),'',R.title)}
-      ${kpi('Споживання',t.load?fmt(t.load):'—','кВт·год',metered.length+' лічильн.')}
-      ${kpi('З мережі',t.imp?fmt(t.imp):'—','кВт·год','імпорт')}
-      ${kpi('У мережу',t.exp!=null?fmt(t.exp):'—','кВт·год','надлишок ПВ')}
-      ${kpi('Станцій онлайн',S.filter(s=>s.status==='connected').length+' / '+S.length,'',probs.length?'⚠ '+probs.length+' проблемних':'усі справні')}
+      ${kpi('Поточна потужність',fmt(T.now,1),'кВт','по '+S.length+' станціях')}
+      ${kpi('Енергія сьогодні',fmt(T.pvD),'кВт·год',inc(T.revD),1)}
+      ${kpi('Цей місяць',eM.v,eM.u,inc(T.revM))}
+      ${kpi('Цей рік',eY.v,eY.u,inc(T.revY))}
+      ${kpi('За весь час',eL.v,eL.u,inc(T.revL))}
+      ${kpi('Станцій онлайн',online+' / '+S.length,'',probs.length?'⚠ '+probs.length+' потребують уваги':'усі справні')}
     </div>
+    <h2 class="sec">Усі станції <span style="font-weight:600;font-size:12px;color:#94a3b8">· генерація сьогодні наживо</span></h2>
+    <div class="cards">${S.map((s,i)=>scard(s,i)).join('')}</div>
     <h2 class="sec">Генерація по станціях — ${R.title} <span style="font-weight:600;font-size:12px;color:#94a3b8">· натисніть станцію в легенді, щоб приховати/показати</span></h2>
-    <div class="panel"><div class="cwrap tall"><canvas id="oGen"></canvas></div></div>
-    <h2 class="sec">Усі станції</h2>
-    <div class="cards">${S.map((s,i)=>scard(s,i,agg(s,R),R)).join('')}</div>`;
-  // fleet generation stacked by station
+    ${rangeBar()}
+    <div class="panel"><div class="cwrap tall"><canvas id="oGen"></canvas></div></div>`;
+  // live generation sparkline under each station card
+  S.forEach((s,i)=>{const c=s.today_curve||[];
+    if(c.some(p=>p.kw!=null)) sparkline('spark'+i,c.map(p=>p.t),c.map(p=>p.kw),stCol(s.status));});
+  // fleet generation stacked by station (date-filtered)
+  const per=S.map(s=>({s,a:agg(s,R)}));
   const allL=[...new Set(per.flatMap(p=>p.a.data.map(d=>d.label)))].sort();
   const sets=per.map((p,i)=>{const m=Object.fromEntries(p.a.data.map(d=>[d.label,d.pv]));
     return {l:short(p.s.name),d:allL.map(x=>m[x]??0),c:COLORS[i%COLORS.length]};});
   bars('oGen',allL.map(x=>lbl(x,R.gran)),sets,'кВт·год',true);
 }
-function scard(s,i,a,R){
+function scard(s,i){
   const c=stCol(s.status);
+  const today=(s.today&&s.today.pv)||0;
+  const month=(s.monthly||[]).find(x=>x.label===TODAY.slice(0,7))?.pv||0;
+  const life=(s.yearly||[]).reduce((a,y)=>a+(y.pv||0),0);
+  const hasCurve=(s.today_curve||[]).some(p=>p.kw!=null);
   return `<div class="scard" style="border-top-color:${c}" onclick="go(${i})">
     <div class="top"><div class="nm">${s.name} · ${cap(s)}</div><div class="badge" style="background:${c}">${stLbl(s.status)}</div></div>
     <div class="now">${fmt(s.now_kw,1)}<u> кВт зараз</u></div>
     <div class="mini">
-      ${noHist(s)?`
-      <div><div class="l">Сьогодні</div><div class="x">${fmt(s.today_kwh)} кВт·г</div></div>
-      <div><div class="l">Всього</div><div class="x">${fmt(s.total_kwh/1e6,2)} ГВт·г</div></div>
-      <div><div class="l">Дохід (всього)</div><div class="x">€${fmt(s.total_rev)}</div></div>
-      <div><div class="l">Пристроїв</div><div class="x">${s.device_num||'—'}</div></div>`:`
-      <div><div class="l">Генерація (${R.title})</div><div class="x">${fmt(a.tot.pv)} кВт·г</div></div>
-      <div><div class="l">${hasRev(s)?'Дохід':'Дохід (всього)'}</div><div class="x">€${fmt(hasRev(s)?a.tot.rev:(s.total_rev||0))}</div></div>
-      ${s.metered?`<div><div class="l">Споживання</div><div class="x">${fmt(a.tot.load)} кВт·г</div></div>
-      <div><div class="l">Самозабезпечення</div><div class="x">${a.tot.load?Math.round(a.tot.selfuse/a.tot.load*100):0}%</div></div>`:
-      `<div><div class="l">Лічильник</div><div class="x" style="color:#94a3b8">немає</div></div>
-      <div><div class="l">Пік сьогодні</div><div class="x">${fmt(Math.max(0,...s.today_curve.map(p=>p.kw||0)),1)} кВт</div></div>`}`}
-    </div></div>`;
+      <div><div class="l">Сьогодні</div><div class="x">${cardE(today)}</div></div>
+      <div><div class="l">Цей місяць</div><div class="x">${cardE(month)}</div></div>
+      <div><div class="l">За весь час</div><div class="x">${cardE(life)}</div></div>
+    </div>
+    <div class="spark">${hasCurve?`<canvas id="spark${i}"></canvas>`:`<div class="nospark">немає даних сьогодні</div>`}</div>
+  </div>`;
 }
 
 /* ---------- STATION ---------- */
