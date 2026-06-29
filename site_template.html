@@ -51,31 +51,20 @@
   .cwrap{position:relative;width:100%;height:300px}
   .cwrap.tall{height:340px}
   .cwrap.sm{height:240px}
-  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(335px,1fr));gap:18px}
-  .scard{position:relative;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:18px;cursor:pointer;overflow:hidden;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
-  .scard:hover{transform:translateY(-4px);box-shadow:0 22px 44px -22px rgba(15,23,42,.34);border-color:#dbe4ee}
-  .scard .accent{position:absolute;top:0;left:0;right:0;height:4px;z-index:2}
-  .scard .pad{flex:1;padding:17px 18px 15px}
-  .scard .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-  .scard .nm{font-weight:750;font-size:16px;letter-spacing:-.2px;line-height:1.2;color:var(--ink)}
-  .scard .capsub{font-size:11.5px;color:var(--faint);font-weight:600;margin-top:4px}
-  .pill{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;padding:5px 11px 5px 9px;border-radius:999px;white-space:nowrap;text-transform:uppercase;letter-spacing:.3px}
-  .pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
-  .pill .dot.live{animation:lpulse 2s infinite}
-  @keyframes lpulse{0%{box-shadow:0 0 0 0 currentColor}70%{box-shadow:0 0 0 6px transparent}100%{box-shadow:0 0 0 0 transparent}}
-  .scard .now{font-size:31px;font-weight:820;margin-top:15px;letter-spacing:-1.3px;line-height:1;color:var(--ink)}
-  .scard .now u{font-size:13px;color:var(--faint);font-weight:700;font-style:normal;letter-spacing:0;text-decoration:none}
-  .util{margin-top:12px}
-  .util .track{height:7px;border-radius:999px;background:#eef2f6;overflow:hidden}
-  .util .fill{height:100%;border-radius:999px;transition:width .4s ease}
-  .util .ulbl{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--faint);margin-top:6px}
-  .mini{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 10px;margin-top:15px;border-top:1px solid var(--line);padding-top:13px}
-  .mini .l{font-size:9.5px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
-  .mini .x{font-size:14.5px;font-weight:750;margin-top:3px;color:var(--ink)}
-  .mini .x small{font-size:10px;color:var(--faint);font-weight:700}
-  .spark{height:76px;position:relative}
-  .spark canvas{display:block}
-  .spark .nospark{height:100%;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:11.5px;font-weight:600;background:repeating-linear-gradient(-45deg,#fafbfc,#fafbfc 6px,#f4f6f9 6px,#f4f6f9 12px)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
+  .scard{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:18px;cursor:pointer;border-top:4px solid var(--slate);transition:transform .12s,box-shadow .12s}
+  .scard:hover{transform:translateY(-3px);box-shadow:0 12px 28px -14px rgba(15,23,42,.28)}
+  .scard .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .scard .nm{font-weight:700;font-size:15.5px}
+  .badge{font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;color:#fff;white-space:nowrap}
+  .scard .now{font-size:28px;font-weight:800;margin:12px 0 0;letter-spacing:-1px}
+  .scard .now u{font-size:13px;color:var(--faint);font-weight:700;font-style:normal}
+  .mini{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  .mini .x small{font-size:9.5px;color:var(--faint);font-weight:700}
+  .spark{height:62px;position:relative;margin-top:12px}
+  .spark .nospark{height:100%;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:11.5px;font-weight:600}
+  .mini .l{font-size:9.5px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+  .mini .x{font-size:12.5px;font-weight:700;margin-top:2px}
   .dhead{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:flex-start;margin:22px 0 4px}
   .dhead .h1{font-size:25px;font-weight:800;letter-spacing:-.6px;display:flex;align-items:center;gap:12px}
   .dhead .addr{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:560px}
@@ -91,7 +80,7 @@
     .kpi{padding:13px 13px;border-radius:13px}
     .kpi .v{font-size:20px} .kpi .k{font-size:10px}
     .cards{grid-template-columns:1fr}
-    .scard .pad{padding:16px 16px 13px}
+    .scard{padding:16px}
     .rb{padding:6px 11px;font-size:12.5px}
     .rangebar{padding:9px 10px;gap:6px;margin:16px 0}
     .rangebar input[type=date]{padding:5px 7px;font-size:12.5px}
@@ -208,15 +197,12 @@ function lines(id,labels,sets){
 /* ---------- OVERVIEW ---------- */
 function sparkline(id,labels,data,color){
   const ctx=document.getElementById(id); if(!ctx)return;
-  const g=ctx.getContext('2d').createLinearGradient(0,0,0,80);
-  g.addColorStop(0,color+'48'); g.addColorStop(.8,color+'0d'); g.addColorStop(1,color+'00');
   const peak=Math.max(0,...data.filter(x=>x!=null));
   charts.push(new Chart(ctx,{type:'line',data:{labels,datasets:[{data,borderColor:color,
-    backgroundColor:g,borderWidth:2,fill:true,tension:.4,pointRadius:0,pointHoverRadius:3,
-    pointHoverBackgroundColor:color,pointHoverBorderColor:'#fff',pointHoverBorderWidth:1.5,spanGaps:false}]},
-    options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{intersect:false,mode:'index'},layout:{padding:0},
-      plugins:{legend:{display:false},tooltip:{displayColors:false,padding:8,titleFont:{size:11},bodyFont:{size:12},callbacks:{title:c=>c[0].label,label:c=>` ${fmt(c.parsed.y,1)} кВт`}}},
-      scales:{x:{display:false},y:{display:false,beginAtZero:true,suggestedMax:peak*1.12||1}}}}));
+    backgroundColor:color+'1f',borderWidth:1.6,fill:true,tension:.4,pointRadius:0,pointHoverRadius:3,spanGaps:false}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{intersect:false,mode:'index'},
+      plugins:{legend:{display:false},tooltip:{displayColors:false,callbacks:{title:c=>c[0].label,label:c=>` ${fmt(c.parsed.y,1)} кВт`}}},
+      scales:{x:{display:false},y:{display:false,beginAtZero:true,suggestedMax:peak*1.1||1}}}}));
 }
 function overview(){
   clearCharts();
@@ -265,27 +251,14 @@ function scard(s,i){
   const today=(s.today&&s.today.pv)||0;
   const month=(s.monthly||[]).find(x=>x.label===TODAY.slice(0,7))?.pv||0;
   const life=(s.yearly||[]).reduce((a,y)=>a+(y.pv||0),0);
-  const curve=s.today_curve||[];
-  const hasCurve=curve.some(p=>p.kw!=null);
-  const peak=Math.max(0,...curve.map(p=>p.kw||0));
-  const pct=s.nominal_kw>0?Math.round(s.now_kw/s.nominal_kw*100):null;
-  return `<div class="scard" onclick="go(${i})">
-    <span class="accent" style="background:${c}"></span>
-    <div class="pad">
-      <div class="top">
-        <div><div class="nm">${s.name}</div><div class="capsub">${s.nominal_kw>0?fmt(s.nominal_kw)+' кВт встановлено':'потужність невідома'}</div></div>
-        <span class="pill" style="color:${c};background:${c}15"><span class="dot${s.status==='connected'?' live':''}"></span>${stLbl(s.status)}</span>
-      </div>
-      <div class="now">${fmt(s.now_kw,1)}<u> кВт зараз</u></div>
-      ${pct!=null?`<div class="util">
-        <div class="track"><div class="fill" style="width:${Math.min(100,pct)}%;background:${c}"></div></div>
-        <div class="ulbl"><span><b style="color:${c}">${pct}%</b> від потужності</span><span>пік сьогодні ${fmt(peak,0)} кВт</span></div>
-      </div>`:''}
-      <div class="mini">
-        <div><div class="l">Сьогодні</div><div class="x">${cardE(today)}</div></div>
-        <div><div class="l">Цей місяць</div><div class="x">${cardE(month)}</div></div>
-        <div><div class="l">За весь час</div><div class="x">${cardE(life)}</div></div>
-      </div>
+  const hasCurve=(s.today_curve||[]).some(p=>p.kw!=null);
+  return `<div class="scard" style="border-top-color:${c}" onclick="go(${i})">
+    <div class="top"><div class="nm">${s.name} · ${cap(s)}</div><div class="badge" style="background:${c}">${stLbl(s.status)}</div></div>
+    <div class="now">${fmt(s.now_kw,1)}<u> кВт зараз</u></div>
+    <div class="mini">
+      <div><div class="l">Сьогодні</div><div class="x">${cardE(today)}</div></div>
+      <div><div class="l">Цей місяць</div><div class="x">${cardE(month)}</div></div>
+      <div><div class="l">За весь час</div><div class="x">${cardE(life)}</div></div>
     </div>
     <div class="spark">${hasCurve?`<canvas id="spark${i}"></canvas>`:`<div class="nospark">немає даних сьогодні</div>`}</div>
   </div>`;
