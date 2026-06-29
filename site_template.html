@@ -71,7 +71,31 @@
   .pill{display:inline-flex;gap:6px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:600;color:var(--muted)}
   .ok{color:var(--green);font-weight:700}
   .foot{text-align:center;color:var(--faint);font-size:12px;margin-top:34px}
+  .curtog{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+  .cbtn{border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:800;padding:5px 11px;cursor:pointer}
+  .cbtn.on{background:var(--ink);color:#fff}
+  .prices{margin:26px 0 6px;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .prices>summary{cursor:pointer;padding:14px 18px;font-weight:700;font-size:14px;color:#334155;list-style:none;user-select:none;display:flex;align-items:center;gap:8px}
+  .prices>summary::-webkit-details-marker{display:none}
+  .prices>summary::after{content:'▾';margin-left:auto;color:var(--faint);transition:transform .15s}
+  .prices[open]>summary::after{transform:rotate(180deg)}
+  .prices>summary:hover{background:#f8fafc}
+  .prices .pbody{padding:6px 18px 18px;border-top:1px solid var(--line)}
+  .prices .prow{display:flex;align-items:center;gap:10px;margin:14px 0 6px}
+  .prices label{font-size:13px;font-weight:600;color:var(--muted)}
+  .ptbl{width:100%;border-collapse:collapse;font-size:13px}
+  .ptbl th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--faint);font-weight:700;padding:6px 8px;border-bottom:1px solid var(--line)}
+  .ptbl td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+  .ptbl .pn{font-weight:600;white-space:normal}
+  .ptbl .pd{color:var(--muted);font-size:12px}
+  .ptbl .pdh{font-size:9.5px;color:var(--faint)}
+  .ptbl input{width:84px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}
+  .pacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+  .phint{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.55}
   @media(max-width:640px){
+    .ptbl .pd,.ptbl .thd{display:none}
+    .ptbl th,.ptbl td{padding:7px 5px}
+    .ptbl input{width:70px}
     .wrap{padding:0 14px 40px}
     .bar{padding:12px 14px;gap:10px}
     .charts{grid-template-columns:1fr}
@@ -93,7 +117,7 @@
 <header><div class="bar">
   <div class="brand">☀️ Сонячний парк Brenvel</div>
   <nav id="nav"></nav>
-  <div class="meta"><span id="upd"></span><span class="live"><span class="dot"></span>НАЖИВО</span></div>
+  <div class="meta"><span class="curtog" id="curtog"><button class="cbtn on" data-c="€" onclick="setCur('€')">€</button><button class="cbtn" data-c="₴" onclick="setCur('₴')">₴</button></span><span id="upd"></span><span class="live"><span class="dot"></span>НАЖИВО</span></div>
 </div></header>
 <div class="wrap"><div id="view"></div><div class="foot" id="foot"></div></div>
 
@@ -156,8 +180,22 @@ const lbl=(s,gran)=>gran==='daily'?s.slice(5):s;
 function kpi(k,v,u,s,acc){return `<div class="kpi${acc?' accent':''}"><div class="k">${k}</div><div class="v">${v}${u?` <span class="u">${u}</span>`:''}</div>${s?`<div class="s">${s}</div>`:''}</div>`;}
 function eScale(k){k=k||0; if(k>=1e6)return{v:fmt(k/1e6,1),u:'ГВт·год'}; if(k>=1e3)return{v:fmt(k/1e3,1),u:'МВт·год'}; return{v:fmt(k),u:'кВт·год'};}
 function cardE(k){const e=eScale(k); return `${e.v} <small>${e.u.replace('год','г')}</small>`;}
-function money(v){v=v||0; return '€'+(v>=1e6?fmt(v/1e6,2)+' млн':fmt(v));}
+let CUR='€'; let FX=+(DATA.fx)||42;
+const REPO=DATA.repo||'tantisch/brenvel-solar-dashboard';
+let PRICES_OPEN=false;
+/* income for pvKwh (with known EUR revenue) for a station, in the active currency */
+function incomeOf(s,pvKwh,eurRev){
+  pvKwh=pvKwh||0; const p=(s&&s.pr)||{};
+  if(p.custom){
+    const eur=(p.eur>0)?pvKwh*p.eur/1000:(eurRev||0);
+    if(CUR==='₴') return (p.uah>0)?pvKwh*p.uah/1000:eur*FX;
+    return eur;
+  }
+  return CUR==='₴'?(eurRev||0)*FX:(eurRev||0);
+}
+function money(v){v=v||0; return CUR+(v>=1e6?fmt(v/1e6,2)+' млн':fmt(v));}
 function inc(r){return `<b style="color:#15803d;font-weight:800;font-size:14px">${money(r)}</b> <span style="color:#94a3b8">дохід</span>`;}
+function setCur(c){if(c===CUR)return; CUR=c; document.querySelectorAll('#curtog .cbtn').forEach(b=>b.classList.toggle('on',b.dataset.c===c)); rerender();}
 const axMoney=v=>v>=1000?(v/1000)+'к':v;
 function bars(id,labels,sets,unit='кВт·год',stacked=false){
   const ctx=document.getElementById(id); if(!ctx)return;
@@ -213,10 +251,10 @@ function overview(){
   const tRev=s=>s.today_rev!=null?s.today_rev:((s.daily||[]).find(d=>d.label===TODAY)?.rev||0);
   const sumY=(s,k)=>(s.yearly||[]).reduce((a,y)=>a+(y[k]||0),0);
   const T={now:S.reduce((a,s)=>a+s.now_kw,0),
-    pvD:S.reduce((a,s)=>a+((s.today&&s.today.pv)||0),0), revD:S.reduce((a,s)=>a+tRev(s),0),
-    pvM:S.reduce((a,s)=>a+(fM(s,TM)?.pv||0),0),          revM:S.reduce((a,s)=>a+(fM(s,TM)?.rev||0),0),
-    pvY:S.reduce((a,s)=>a+(fY(s,TY)?.pv||0),0),          revY:S.reduce((a,s)=>a+(fY(s,TY)?.rev||0),0),
-    pvL:S.reduce((a,s)=>a+sumY(s,'pv'),0),               revL:S.reduce((a,s)=>a+sumY(s,'rev'),0)};
+    pvD:S.reduce((a,s)=>a+((s.today&&s.today.pv)||0),0), revD:S.reduce((a,s)=>a+incomeOf(s,(s.today&&s.today.pv)||0,tRev(s)),0),
+    pvM:S.reduce((a,s)=>a+(fM(s,TM)?.pv||0),0),          revM:S.reduce((a,s)=>a+incomeOf(s,fM(s,TM)?.pv||0,fM(s,TM)?.rev||0),0),
+    pvY:S.reduce((a,s)=>a+(fY(s,TY)?.pv||0),0),          revY:S.reduce((a,s)=>a+incomeOf(s,fY(s,TY)?.pv||0,fY(s,TY)?.rev||0),0),
+    pvL:S.reduce((a,s)=>a+sumY(s,'pv'),0),               revL:S.reduce((a,s)=>a+incomeOf(s,sumY(s,'pv'),sumY(s,'rev')),0)};
   const online=S.filter(s=>s.status==='connected').length;
   const probs=S.filter(s=>s.status!=='connected');
   const eM=eScale(T.pvM), eY=eScale(T.pvY), eL=eScale(T.pvL);
@@ -235,7 +273,8 @@ function overview(){
     <div class="cards">${S.map((s,i)=>scard(s,i)).join('')}</div>
     <h2 class="sec">Генерація по станціях — ${R.title} <span style="font-weight:600;font-size:12px;color:#94a3b8">· натисніть станцію в легенді, щоб приховати/показати</span></h2>
     ${rangeBar()}
-    <div class="panel"><div class="cwrap tall"><canvas id="oGen"></canvas></div></div>`;
+    <div class="panel"><div class="cwrap tall"><canvas id="oGen"></canvas></div></div>
+    ${pricesPanel()}`;
   // live generation sparkline under each station card
   S.forEach((s,i)=>{const c=s.today_curve||[];
     if(c.some(p=>p.kw!=null)) sparkline('spark'+i,c.map(p=>p.t),c.map(p=>p.kw),stCol(s.status));});
@@ -245,6 +284,52 @@ function overview(){
   const sets=per.map((p,i)=>{const m=Object.fromEntries(p.a.data.map(d=>[d.label,d.pv]));
     return {l:short(p.s.name),d:allL.map(x=>m[x]??0),c:COLORS[i%COLORS.length]};});
   bars('oGen',allL.map(x=>lbl(x,R.gran)),sets,'кВт·год',true);
+}
+/* ---------- price editor (per-MWh tariff; shared via GitHub) ---------- */
+function pricesPanel(){
+  const rows=S.map((s,i)=>`<tr>
+    <td class="pn">${s.name}</td>
+    <td class="pd">${fmt(s.pr.def_eur,0)} €<div class="pdh">за замовч., €/МВт·г</div></td>
+    <td><input id="pe${i}" type="number" min="0" step="1" inputmode="decimal" placeholder="${fmt(s.pr.def_eur,0)}" value="${s.pr.custom&&s.pr.eur?s.pr.eur:''}"> <small style="color:#94a3b8">€</small></td>
+    <td><input id="pu${i}" type="number" min="0" step="1" inputmode="decimal" placeholder="${fmt(Math.round(s.pr.def_eur*FX),0)}" value="${s.pr.custom&&s.pr.uah?s.pr.uah:''}"> <small style="color:#94a3b8">₴</small></td>
+  </tr>`).join('');
+  return `<details class="prices" ${PRICES_OPEN?'open':''} ontoggle="PRICES_OPEN=this.open">
+    <summary>⚙️ Тарифи та дохід — задати ціну за МВт·год (€ і ₴) для кожної станції</summary>
+    <div class="pbody">
+      <div class="prow"><label>Курс ₴ за 1 €</label><input id="fxin" type="number" min="0" step="0.1" inputmode="decimal" value="${FX}" style="width:92px"></div>
+      <div style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Станція</th><th class="thd">Базова ціна</th><th>Ваша ціна €/МВт·год</th><th>Ваша ціна ₴/МВт·год</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="pacts">
+        <button class="rb on" onclick="applyPrices()">Застосувати (перегляд)</button>
+        <button class="rb" onclick="savePrices()">💾 Зберегти для всіх (GitHub)</button>
+        <button class="rb" onclick="resetPrices()">Скинути</button>
+      </div>
+      <div class="phint"><b>«Застосувати»</b> — перерахунок доходу лише у вашому браузері (для прикидки). <b>«Зберегти для всіх»</b> — відкриє GitHub, де ціна збережеться <b>назавжди і для всіх</b>; дашборд оновиться за ~2 хв (потрібен вхід у GitHub із доступом до репозиторію). Порожнє поле = базова ціна / дохід від системи. Перемикач <b>€ / ₴</b> угорі змінює валюту всіх сум доходу.</div>
+    </div></details>`;
+}
+function applyPrices(){
+  const fx=parseFloat((document.getElementById('fxin')||{}).value); if(fx>0)FX=fx;
+  S.forEach((s,i)=>{
+    const e=parseFloat((document.getElementById('pe'+i)||{}).value);
+    const u=parseFloat((document.getElementById('pu'+i)||{}).value);
+    const hasE=e>0,hasU=u>0;
+    s.pr.custom=hasE||hasU; s.pr.eur=hasE?e:null; s.pr.uah=hasU?u:null;
+  });
+  PRICES_OPEN=true; rerender();
+}
+function resetPrices(){ S.forEach(s=>{s.pr.custom=false;s.pr.eur=null;s.pr.uah=null;}); PRICES_OPEN=true; rerender(); }
+function savePrices(){
+  const fx=parseFloat((document.getElementById('fxin')||{}).value)||FX;
+  const stations={};
+  S.forEach((s,i)=>{
+    const e=parseFloat((document.getElementById('pe'+i)||{}).value);
+    const u=parseFloat((document.getElementById('pu'+i)||{}).value);
+    const ent={}; if(e>0)ent.eur_mwh=e; if(u>0)ent.uah_mwh=u;
+    if(Object.keys(ent).length) stations[s.name]=ent;
+  });
+  const obj={uah_per_eur:fx,stations};
+  const body='Збереження тарифів для всіх станцій. Бот застосує автоматично — **не редагуйте** JSON нижче вручну.\n\n```json\n'+JSON.stringify(obj,null,2)+'\n```\n\nПісля натискання «Submit new issue» ціни збережуться і дашборд оновиться за ~2 хв.';
+  const url='https://github.com/'+REPO+'/issues/new?labels=price&title='+encodeURIComponent('Оновлення тарифів станцій')+'&body='+encodeURIComponent(body);
+  window.open(url,'_blank','noopener');
 }
 function scard(s,i){
   const c=stCol(s.status);
@@ -286,7 +371,7 @@ function stationLive(s){
       ${kpi('Встановлено',fmt(s.nominal_kw),'кВт')}
       ${kpi('Завантаженість',s.nominal_kw?Math.round(s.now_kw/s.nominal_kw*100)+' %':'—','','зараз')}
       ${kpi('Всього вироблено',fmt(s.total_kwh/1e6,2),'ГВт·год')}
-      ${kpi('Дохід за весь час','€'+fmt(s.total_rev),'')}
+      ${kpi('Дохід за весь час',money(CUR==='₴'?(s.total_rev||0)*FX:(s.total_rev||0)),'')}
     </div>
     <h2 class="sec">Аварії</h2>
     <div class="panel"><div class="ok">✓ Немає активних аварій</div></div>`;
@@ -299,7 +384,9 @@ function station(i){
   const td=s.today||{}, peak=Math.max(0,...s.today_curve.map(p=>p.kw||0));
   const overlap=s.metered&&s.today_overlap&&s.today_overlap.some(p=>p.pv!=null||p.load!=null);
   const mapUrl=(s.lat&&s.lon)?`https://www.google.com/maps?q=${s.lat},${s.lon}`:null;
-  const epv=t.pv?'€'+fmt(t.rev/t.pv,3)+'/кВт·год':'—';
+  const showRev=hasRev(s)||s.pr.custom;
+  const periodInc=incomeOf(s,t.pv,t.rev);
+  const epv=t.pv?money(Math.round(periodInc/(t.pv/1000)))+'/МВт·год':'—';
   const v=document.getElementById('view');
   v.innerHTML=`
     <div class="dhead">
@@ -320,7 +407,7 @@ function station(i){
       ${kpi('Потужність зараз',fmt(s.now_kw,1),'кВт')}
       ${kpi('Пік сьогодні',fmt(peak,1),'кВт')}
       ${kpi('Генерація сьогодні',fmt(td.pv),'кВт·год',null,1)}
-      ${(s.today_rev!=null)?kpi('Дохід сьогодні',' €'+fmt(s.today_rev),'',s.eur_kwh?'≈ €'+fmt(s.eur_kwh,3)+'/кВт·год':''):''}
+      ${showRev?kpi('Дохід сьогодні',money(incomeOf(s,(s.today&&s.today.pv)||0,s.today_rev!=null?s.today_rev:((s.daily||[]).find(d=>d.label===TODAY)?.rev||0))),'',''):''}
       ${s.metered?kpi('Споживання',fmt(td.load),'кВт·год'):''}
       ${s.metered?kpi('Самоспоживання ПВ',td.self_cons!=null?fmt(td.self_cons,0):'—','%','генерації спожито на місці'):''}
       ${s.metered?kpi('Самозабезпечення',td.self_suff!=null?fmt(td.self_suff,0):'—','%','навантаження з ПВ'):''}
@@ -344,15 +431,15 @@ function station(i){
       ${s.metered?kpi('Віддано в мережу',fmt(t.export),'кВт·год','надлишок ПВ'):''}
       ${s.metered?kpi('Куплено з мережі',fmt(t.imp),'кВт·год','імпорт'):''}
       ${s.metered?kpi('Самозабезпечення',t.load?Math.round(t.selfuse/t.load*100):'—','%','навантаження з ПВ'):''}
-      ${hasRev(s)?kpi('Дохід',' €'+fmt(t.rev),'',R.title):kpi('Дохід за весь час',' €'+fmt(s.total_rev||0),'')}
-      ${hasRev(s)?kpi('Сер. ціна',epv,'','дохід / генерацію'):kpi('Пристроїв',s.n_inverters||s.device_num||'—','')}
+      ${showRev?kpi('Дохід',money(periodInc),'',R.title):kpi('Пристроїв',s.n_inverters||s.device_num||'—','')}
+      ${showRev?kpi('Сер. ціна',epv,'',s.pr.custom?'ваша ціна':'дохід ÷ генерацію'):''}
     </div>
     ${!s.metered?`<div class="note">ℹ️ На цій станції не встановлено лічильник споживання — дані про навантаження, імпорт і експорт у мережу недоступні у FusionSolar. Показано генерацію та дохід.</div>`:''}
     <div class="charts">
       ${s.metered?`<div class="panel full"><h3>Генерація проти споживання</h3><div class="sub">${R.title} · кВт·год</div><div class="cwrap"><canvas id="dGenLoad"></canvas></div></div>`:
         `<div class="panel full"><h3>Генерація ПВ</h3><div class="sub">${R.title} · кВт·год</div><div class="cwrap"><canvas id="dGenLoad"></canvas></div></div>`}
       ${s.metered?`<div class="panel"><h3>Обмін з мережею</h3><div class="sub">імпорт vs експорт · кВт·год</div><div class="cwrap"><canvas id="dGrid"></canvas></div></div>`:''}
-      ${hasRev(s)?`<div class="panel"><h3>Дохід</h3><div class="sub">${R.title} · €</div><div class="cwrap"><canvas id="dRev"></canvas></div></div>`:''}
+      ${showRev?`<div class="panel"><h3>Дохід</h3><div class="sub">${R.title} · ${CUR}</div><div class="cwrap"><canvas id="dRev"></canvas></div></div>`:''}
       ${s.metered?`<div class="panel"><h3>Куди пішла генерація</h3><div class="sub">самоспоживання vs експорт</div><div class="cwrap sm"><canvas id="dDoGen"></canvas></div></div>
       <div class="panel"><h3>Звідки спожито</h3><div class="sub">від ПВ vs з мережі</div><div class="cwrap sm"><canvas id="dDoUse"></canvas></div></div>`:''}
     </div>
@@ -367,7 +454,7 @@ function station(i){
   if(s.metered) bars('dGenLoad',L,[{l:'Генерація ПВ',d:a.data.map(d=>d.pv),c:C.pv},{l:'Споживання',d:a.data.map(d=>d.load),c:C.load}]);
   else bars('dGenLoad',L,[{l:'Генерація ПВ',d:a.data.map(d=>d.pv),c:C.pv}]);
   if(s.metered) bars('dGrid',L,[{l:'З мережі',d:a.data.map(d=>d.imp),c:C.imp},{l:'У мережу',d:a.data.map(d=>d.export),c:C.export}]);
-  if(hasRev(s)) bars('dRev',L,[{l:'Дохід',d:a.data.map(d=>d.rev),c:C.rev}],'€');
+  if(showRev) bars('dRev',L,[{l:'Дохід',d:a.data.map(d=>incomeOf(s,d.pv,d.rev)),c:C.rev}],CUR);
   if(s.metered){
     donut('dDoGen',['Самоспоживання','Експорт у мережу'],[t.selfuse||0,t.export||0],['#16a34a','#f59e0b']);
     donut('dDoUse',['Від ПВ','З мережі'],[t.selfuse||0,t.imp||0],['#16a34a','#ef4444']);

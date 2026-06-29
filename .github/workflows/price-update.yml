@@ -1,0 +1,91 @@
+name: Apply price update from issue
+
+# The dashboard's price editor opens a prefilled GitHub issue (label: price)
+# containing a JSON block. This workflow validates it, writes it to
+# config/prices.json and commits to main — which triggers the deploy workflow
+# to rebuild the dashboard with the new tariffs (~2 min). No tokens live in the
+# public page: the person saving authenticates with their own GitHub session,
+# and only collaborators can apply the `price` label.
+on:
+  issues:
+    types: [opened, edited, labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: price-update
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    # only act on price-labeled issues opened by someone with repo access
+    if: >
+      contains(github.event.issue.labels.*.name, 'price') &&
+      (github.event.issue.author_association == 'OWNER' ||
+       github.event.issue.author_association == 'MEMBER' ||
+       github.event.issue.author_association == 'COLLABORATOR')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Parse issue body -> config/prices.json
+        id: parse
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          python3 - <<'PY'
+          import os, re, json
+          body = os.environ.get("BODY", "")
+          m = re.search(r'```json\s*(\{.*?\})\s*```', body, re.S)
+          if not m:
+              print("::error::no ```json block found in the issue body")
+              raise SystemExit(1)
+          obj = json.loads(m.group(1))
+          fx = float(obj.get("uah_per_eur", 42) or 42)
+          if not (0 < fx < 1000):
+              print("::error::uah_per_eur out of range"); raise SystemExit(1)
+          clean = {"uah_per_eur": round(fx, 2), "stations": {}}
+          for name, v in (obj.get("stations") or {}).items():
+              if not isinstance(v, dict):
+                  continue
+              ent = {}
+              for key in ("eur_mwh", "uah_mwh"):
+                  val = v.get(key)
+                  if isinstance(val, (int, float)) and 0 < val < 1_000_000:
+                      ent[key] = round(float(val), 2)
+              if ent:
+                  clean["stations"][str(name)[:80]] = ent
+          os.makedirs("config", exist_ok=True)
+          with open("config/prices.json", "w", encoding="utf-8") as fh:
+              json.dump(clean, fh, ensure_ascii=False, indent=2)
+          print("Wrote config/prices.json:")
+          print(json.dumps(clean, ensure_ascii=False, indent=2))
+          PY
+      - name: Commit if changed
+        id: commit
+        run: |
+          git config user.name  solar-bot
+          git config user.email actions@github.com
+          if git diff --quiet -- config/prices.json; then
+            echo "no change to prices.json"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git add config/prices.json
+            git commit -q -m "tariffs: update from issue #${{ github.event.issue.number }}"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Acknowledge and close the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ steps.commit.outputs.changed }}" = "true" ]; then
+            MSG="✅ Тарифи збережено в config/prices.json. Дашборд перебудується з новими цінами протягом ~2 хв."
+          else
+            MSG="ℹ️ Зміни не виявлено — ціни вже актуальні."
+          fi
+          gh issue comment "${{ github.event.issue.number }}" --body "$MSG"
+          gh issue close  "${{ github.event.issue.number }}"
