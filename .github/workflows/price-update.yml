@@ -8,7 +8,11 @@ name: Apply price update from issue
 # and only collaborators can apply the `price` label.
 on:
   issues:
-    types: [opened, edited, labeled]
+    # Only react to the `price` label being applied. Opening an issue WITH a
+    # label fires `labeled` (in addition to `opened`); triggering on `labeled`
+    # alone means exactly ONE run — no opened+labeled race that would make the
+    # second run report "no changes" after the first already saved.
+    types: [labeled]
 
 permissions:
   contents: write
@@ -22,7 +26,7 @@ jobs:
   apply:
     # only act on price-labeled issues opened by someone with repo access
     if: >
-      contains(github.event.issue.labels.*.name, 'price') &&
+      github.event.label.name == 'price' &&
       (github.event.issue.author_association == 'OWNER' ||
        github.event.issue.author_association == 'MEMBER' ||
        github.event.issue.author_association == 'COLLABORATOR')
