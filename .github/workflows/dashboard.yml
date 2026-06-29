@@ -50,6 +50,9 @@ jobs:
           n=0
           while [ "$(date +%s)" -lt "$END" ]; do
             START=$(date +%s); n=$((n+1))
+            # Pull the latest main each cycle so tariff edits (config/prices.json)
+            # and code changes are picked up within one cycle without a restart.
+            git fetch -q origin main 2>/dev/null && git reset --hard -q origin/main 2>/dev/null || echo "main sync skipped"
             echo "::group::cycle $n  $(date -u +%FT%TZ)"
             (
               set -e
