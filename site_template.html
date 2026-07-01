@@ -126,7 +126,7 @@
 <script>
 const DATA=__DATA__, S=DATA.stations, TODAY=DATA.updated.slice(0,10);
 const ST={connected:['#16a34a','Онлайн'],disconnected:['#94a3b8','Офлайн'],trouble:['#f59e0b','Попередження'],unknown:['#94a3b8','Невідомо']};
-const COLORS=['#16a34a','#2563eb','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899'];
+const COLORS=['#16a34a','#2563eb','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899','#f97316'];
 const C={pv:'#16a34a',load:'#475569',selfuse:'#16a34a',export:'#f59e0b',imp:'#ef4444',rev:'#0ea5e9'};
 const fmt=(n,d=0)=>(n==null||isNaN(n))?'–':Number(n).toLocaleString('uk-UA',{minimumFractionDigits:d,maximumFractionDigits:d});
 const short=n=>n.replace('Brenvel_','').replace('Brenvei_','');

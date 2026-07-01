@@ -41,6 +41,7 @@ jobs:
           FUSIONSOLAR_PASSWORD: ${{ secrets.FUSIONSOLAR_PASSWORD }}
           NETECO_USER: ${{ secrets.NETECO_USER }}
           NETECO_PASSWORD: ${{ secrets.NETECO_PASSWORD }}
+          SOLARMAN_TOKEN: ${{ secrets.SOLARMAN_TOKEN }}
           STATICRYPT_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
           GH_TOKEN: ${{ github.token }}
           REPO_SLUG: ${{ github.repository }}

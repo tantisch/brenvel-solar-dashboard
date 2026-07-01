@@ -124,6 +124,18 @@ def collect():
         except Exception as e:
             print(f"   ! NetEco collection failed: {type(e).__name__}: {str(e)[:90]}")
 
+    # --- Solarman Smart plant (separate platform: Овруч) ---
+    sm_token = os.environ.get("SOLARMAN_TOKEN")
+    if sm_token:
+        try:
+            from solarman import SolarmanClient
+            for p in SolarmanClient(sm_token).get_fleet():
+                stations.append(p)   # get_fleet() returns fully-normalized records
+                print(f"   • {p['name']} (Solarman) now={p['now_kw']}kW daily={len(p['daily'])} "
+                      f"monthly={len(p['monthly'])} yearly={len(p['yearly'])} curve={len(p['today_curve'])}")
+        except Exception as e:
+            print(f"   ! Solarman collection failed: {type(e).__name__}: {str(e)[:110]}")
+
     bundle = {"updated": now.strftime("%Y-%m-%d %H:%M"), "tz": "Europe/Kyiv",
               "stations": stations}
     os.makedirs("output", exist_ok=True)
