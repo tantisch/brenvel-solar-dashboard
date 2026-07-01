@@ -17,7 +17,13 @@
       "eur_mwh": 192.3
     },
     "Кролевець": {
-      "eur_mwh": 120.0
+      "eur_mwh": 130.0
+    },
+    "Жорнава": {
+      "eur_mwh": 110.0
+    },
+    "СЕС Овруч": {
+      "eur_mwh": 95.0
     }
   },
   "names": {
@@ -25,6 +31,7 @@
     "Brenvel_Turiisk": "Турійськ",
     "Brenvel_Kovel": "Грушевського",
     "Brenvei_K.K_navis": "КК АТП",
-    "Brenvel_K.K_balast": "КК Пелети"
+    "Brenvel_K.K_balast": "КК Пелети",
+    "СЕС Овруч": "Овруч"
   }
 }
