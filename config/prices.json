@@ -1,8 +1,30 @@
 {
   "uah_per_eur": 52.0,
   "stations": {
+    "Brenvel_Zhytomyr": {
+      "eur_mwh": 192.3
+    },
+    "Brenvel_Turiisk": {
+      "eur_mwh": 192.3
+    },
+    "Brenvel_Kovel": {
+      "eur_mwh": 192.3
+    },
+    "Brenvei_K.K_navis": {
+      "eur_mwh": 192.3
+    },
+    "Brenvel_K.K_balast": {
+      "eur_mwh": 192.3
+    },
     "Кролевець": {
       "eur_mwh": 120.0
     }
+  },
+  "names": {
+    "Brenvel_Zhytomyr": "ВП",
+    "Brenvel_Turiisk": "Турійськ",
+    "Brenvel_Kovel": "Грушевського",
+    "Brenvei_K.K_navis": "КК АТП",
+    "Brenvel_K.K_balast": "КК Пелети"
   }
 }
