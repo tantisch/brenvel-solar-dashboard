@@ -44,7 +44,7 @@ jobs:
           python3 - <<'PY'
           import os, re, json
           body = os.environ.get("BODY", "")
-          m = re.search(r'```json\s*(\{.*?\})\s*```', body, re.S)
+          m = re.search(r'```json\s*(\{.*\})\s*```', body, re.S)
           if not m:
               print("::error::no ```json block found in the issue body")
               raise SystemExit(1)
@@ -52,7 +52,7 @@ jobs:
           fx = float(obj.get("uah_per_eur", 42) or 42)
           if not (0 < fx < 1000):
               print("::error::uah_per_eur out of range"); raise SystemExit(1)
-          clean = {"uah_per_eur": round(fx, 2), "stations": {}}
+          clean = {"uah_per_eur": round(fx, 2), "stations": {}, "names": {}}
           for name, v in (obj.get("stations") or {}).items():
               if not isinstance(v, dict):
                   continue
@@ -60,6 +60,9 @@ jobs:
               val = v.get("eur_mwh")
               if isinstance(val, (int, float)) and 0 < val < 1_000_000:
                   clean["stations"][str(name)[:80]] = {"eur_mwh": round(float(val), 2)}
+          for name, disp in (obj.get("names") or {}).items():
+              if isinstance(disp, str) and disp.strip():
+                  clean["names"][str(name)[:80]] = disp.strip()[:40]
           os.makedirs("config", exist_ok=True)
           with open("config/prices.json", "w", encoding="utf-8") as fh:
               json.dump(clean, fh, ensure_ascii=False, indent=2)

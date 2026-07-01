@@ -34,6 +34,7 @@ def apply_prices(bundle, prices):
     default; `pr.eur`/`pr.uah` are explicit per-MWh overrides (None if unset)."""
     fx = float(prices.get("uah_per_eur", 42) or 42)
     overrides = prices.get("stations", {}) or {}
+    names = prices.get("names", {}) or {}
 
     # default effective EUR/MWh per station from lifetime revenue / generation
     defs, rated = {}, []
@@ -58,6 +59,9 @@ def apply_prices(bundle, prices):
             "eur": eur,
             "def_eur": defs.get(name) or fleet_def,
         }
+        # custom display name (falls back to the stable id `name`)
+        disp = names.get(name)
+        s["display"] = disp.strip() if isinstance(disp, str) and disp.strip() else name
 
     bundle["fx"] = fx
     bundle["repo"] = os.environ.get("REPO_SLUG", "tantisch/brenvel-solar-dashboard")

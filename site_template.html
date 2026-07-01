@@ -130,6 +130,7 @@ const COLORS=['#16a34a','#2563eb','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec48
 const C={pv:'#16a34a',load:'#475569',selfuse:'#16a34a',export:'#f59e0b',imp:'#ef4444',rev:'#0ea5e9'};
 const fmt=(n,d=0)=>(n==null||isNaN(n))?'–':Number(n).toLocaleString('uk-UA',{minimumFractionDigits:d,maximumFractionDigits:d});
 const short=n=>n.replace('Brenvel_','').replace('Brenvei_','');
+const nm=s=>s.display||s.name;   // custom display name (falls back to the stable id s.name)
 const stCol=s=>(ST[s]||ST.unknown)[0], stLbl=s=>(ST[s]||ST.unknown)[1];
 const cap=s=>s.nominal_kw>0?fmt(s.nominal_kw)+' кВт':'—';
 const noHist=s=>!(s.daily&&s.daily.length);  // NetEco/Photomate: live snapshot only
@@ -257,7 +258,7 @@ function overview(){
   const eM=eScale(T.pvM), eY=eScale(T.pvY), eL=eScale(T.pvL);
   const v=document.getElementById('view');
   v.innerHTML=`
-    ${probs.length?`<div class="alert">⚠️ <b>Потребують уваги (${probs.length}):</b> ${probs.map(p=>short(p.name)+' ('+stLbl(p.status).toLowerCase()+')').join(', ')}</div>`:''}
+    ${probs.length?`<div class="alert">⚠️ <b>Потребують уваги (${probs.length}):</b> ${probs.map(p=>short(nm(p))+' ('+stLbl(p.status).toLowerCase()+')').join(', ')}</div>`:''}
     <div class="kpis">
       ${kpi('Поточна потужність',fmt(T.now,1),'кВт','по '+S.length+' станціях')}
       ${kpi('Енергія сьогодні',fmt(T.pvD),'кВт·год',inc(T.revD),1)}
@@ -279,28 +280,28 @@ function overview(){
   const per=S.map(s=>({s,a:agg(s,R)}));
   const allL=[...new Set(per.flatMap(p=>p.a.data.map(d=>d.label)))].sort();
   const sets=per.map((p,i)=>{const m=Object.fromEntries(p.a.data.map(d=>[d.label,d.pv]));
-    return {l:short(p.s.name),d:allL.map(x=>m[x]??0),c:COLORS[i%COLORS.length]};});
+    return {l:short(nm(p.s)),d:allL.map(x=>m[x]??0),c:COLORS[i%COLORS.length]};});
   bars('oGen',allL.map(x=>lbl(x,R.gran)),sets,'кВт·год',true);
 }
 /* ---------- price editor (per-MWh tariff; shared via GitHub) ---------- */
 function pricesPanel(){
-  const rows=S.map((s,i)=>{const eff=(s.pr.custom&&s.pr.eur)?s.pr.eur:s.pr.def_eur; return `<tr>
-    <td class="pn">${s.name}</td>
-    <td class="pd">${fmt(s.pr.def_eur,0)} €<div class="pdh">за замовч., €/МВт·г</div></td>
+  const rows=S.map((s,i)=>{const eff=(s.pr.custom&&s.pr.eur)?s.pr.eur:s.pr.def_eur; const disp=(s.display&&s.display!==s.name)?s.display:''; return `<tr>
+    <td class="pd" style="white-space:normal;max-width:150px">${s.name}<div class="pdh">ідентифікатор</div></td>
+    <td><input id="pnm${i}" type="text" maxlength="40" placeholder="${s.name}" value="${disp.replace(/"/g,'&quot;')}" style="width:160px"></td>
     <td><input id="pe${i}" type="number" min="0" step="1" inputmode="decimal" oninput="recalcUah(${i})" placeholder="${fmt(s.pr.def_eur,0)}" value="${s.pr.custom&&s.pr.eur?s.pr.eur:''}"> <small style="color:#94a3b8">€</small></td>
     <td class="pd"><span id="pu${i}">${fmt(Math.round(eff*FX),0)}</span> ₴<div class="pdh">= € × курс</div></td>
   </tr>`;}).join('');
   return `<details class="prices" ${PRICES_OPEN?'open':''} ontoggle="PRICES_OPEN=this.open">
-    <summary>⚙️ Тарифи та дохід — ціна €/МВт·год для кожної станції (гривня рахується за курсом)</summary>
+    <summary>⚙️ Налаштування станцій — назва та тариф (€/МВт·год, гривня за курсом)</summary>
     <div class="pbody">
       <div class="prow"><label>Курс ₴ за 1 €</label><input id="fxin" type="number" min="0" step="0.1" inputmode="decimal" oninput="recalcAllUah()" value="${FX}" style="width:92px"></div>
-      <div style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Станція</th><th class="thd">Базова ціна</th><th>Ваша ціна €/МВт·год</th><th class="thd">₴/МВт·год (авто)</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div style="overflow-x:auto"><table class="ptbl"><thead><tr><th class="thd">Станція (ID)</th><th>Назва</th><th>Ціна €/МВт·год</th><th class="thd">₴/МВт·год (авто)</th></tr></thead><tbody>${rows}</tbody></table></div>
       <div class="pacts">
         <button class="rb on" onclick="applyPrices()">Застосувати (перегляд)</button>
         <button class="rb" onclick="savePrices()">💾 Зберегти для всіх (GitHub)</button>
         <button class="rb" onclick="resetPrices()">Скинути</button>
       </div>
-      <div class="phint">Вводьте лише ціну в <b>€/МВт·год</b> — гривня рахується автоматично як <b>€ × курс</b>. <b>«Застосувати»</b> — перерахунок доходу лише у вашому браузері (для прикидки). <b>«Зберегти для всіх»</b> — відкриє GitHub, де ціна збережеться <b>назавжди і для всіх</b>; дашборд оновиться за ~1–2 хв (потрібен вхід у GitHub із доступом до репозиторію). Порожнє поле = базова ціна / дохід від системи. Перемикач <b>€ / ₴</b> угорі змінює валюту всіх сум доходу.</div>
+      <div class="phint"><b>Назва</b> — як станція показується всюди (порожнє = ідентифікатор). <b>Ціна</b> — лише €/МВт·год, гривня рахується як <b>€ × курс</b>. <b>«Застосувати»</b> — перегляд лише у вашому браузері. <b>«Зберегти для всіх»</b> — відкриє GitHub, де зміни збережуться <b>назавжди і для всіх</b> (дашборд оновиться за ~1–2 хв; потрібен вхід у GitHub із доступом до репозиторію). Перемикач <b>€ / ₴</b> угорі змінює валюту доходу.</div>
     </div></details>`;
 }
 function recalcUah(i){
@@ -315,18 +316,22 @@ function applyPrices(){
   S.forEach((s,i)=>{
     const e=parseFloat((document.getElementById('pe'+i)||{}).value);
     s.pr.custom=e>0; s.pr.eur=e>0?e:null;
+    const dn=((document.getElementById('pnm'+i)||{}).value||'').trim();
+    s.display=dn||s.name;
   });
-  PRICES_OPEN=true; updateFxNote(); rerender();
+  PRICES_OPEN=true; updateFxNote(); renderNav(curView); rerender();
 }
-function resetPrices(){ S.forEach(s=>{s.pr.custom=false;s.pr.eur=null;}); PRICES_OPEN=true; rerender(); }
+function resetPrices(){ S.forEach(s=>{s.pr.custom=false;s.pr.eur=null;s.display=s.name;}); PRICES_OPEN=true; renderNav(curView); rerender(); }
 function savePrices(){
   const fx=parseFloat((document.getElementById('fxin')||{}).value)||FX;
-  const stations={};
+  const stations={},names={};
   S.forEach((s,i)=>{
     const e=parseFloat((document.getElementById('pe'+i)||{}).value);
     if(e>0) stations[s.name]={eur_mwh:e};
+    const dn=((document.getElementById('pnm'+i)||{}).value||'').trim();
+    if(dn && dn!==s.name) names[s.name]=dn;
   });
-  const obj={uah_per_eur:fx,stations};
+  const obj={uah_per_eur:fx,stations,names};
   const body='Збереження тарифів для всіх станцій. Бот застосує автоматично — **не редагуйте** JSON нижче вручну.\n\n```json\n'+JSON.stringify(obj,null,2)+'\n```\n\nПісля натискання «Submit new issue» ціни збережуться і дашборд оновиться за ~2 хв.';
   const url='https://github.com/'+REPO+'/issues/new?labels=price&title='+encodeURIComponent('Оновлення тарифів станцій')+'&body='+encodeURIComponent(body);
   window.open(url,'_blank','noopener');
@@ -338,7 +343,7 @@ function scard(s,i){
   const life=(s.yearly||[]).reduce((a,y)=>a+(y.pv||0),0);
   const hasCurve=(s.today_curve||[]).some(p=>p.kw!=null);
   return `<div class="scard" style="border-top-color:${c}" onclick="go(${i})">
-    <div class="top"><div class="nm">${s.name} · ${cap(s)}</div><div class="badge" style="background:${c}">${stLbl(s.status)}</div></div>
+    <div class="top"><div class="nm">${nm(s)} · ${cap(s)}</div><div class="badge" style="background:${c}">${stLbl(s.status)}</div></div>
     <div class="now">${fmt(s.now_kw,1)}<u> кВт зараз</u></div>
     <div class="mini">
       <div><div class="l">Сьогодні</div><div class="x">${cardE(today)}</div></div>
@@ -355,7 +360,7 @@ function stationLive(s){
   const mapUrl=(s.lat&&s.lon)?`https://www.google.com/maps?q=${s.lat},${s.lon}`:null;
   document.getElementById('view').innerHTML=`
     <div class="dhead">
-      <div><div class="h1"><span style="width:13px;height:13px;border-radius:50%;background:${c};display:inline-block"></span>${s.name}
+      <div><div class="h1"><span style="width:13px;height:13px;border-radius:50%;background:${c};display:inline-block"></span>${nm(s)}
         <span style="font-size:15px;color:#94a3b8;font-weight:600">· ${cap(s)} встановлено</span></div>
         <div class="addr">📍 ${s.address||'—'}</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -390,7 +395,7 @@ function station(i){
   const v=document.getElementById('view');
   v.innerHTML=`
     <div class="dhead">
-      <div><div class="h1"><span style="width:13px;height:13px;border-radius:50%;background:${c};display:inline-block"></span>${s.name}
+      <div><div class="h1"><span style="width:13px;height:13px;border-radius:50%;background:${c};display:inline-block"></span>${nm(s)}
         <span style="font-size:15px;color:#94a3b8;font-weight:600">· ${cap(s)} встановлено</span></div>
         <div class="addr">📍 ${s.address||'—'}</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -465,7 +470,7 @@ function toggleLoad(show){const ch=charts.find(c=>c.canvas&&c.canvas.id==='dCurv
 
 /* ---------- nav ---------- */
 function renderNav(active){
-  const items=[['Огляд',-1],...S.map((s,i)=>[short(s.name),i])];
+  const items=[['Огляд',-1],...S.map((s,i)=>[short(nm(s)),i])];
   document.getElementById('nav').innerHTML=items.map(([n,i])=>`<button class="tab ${active===i?'active':''}" onclick="go(${i})">${n}</button>`).join('');
 }
 function go(i){curView=i;renderNav(i);window.scrollTo({top:0,behavior:'smooth'});i<0?overview():station(i);}
