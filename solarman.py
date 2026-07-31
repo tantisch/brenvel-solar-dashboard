@@ -35,6 +35,11 @@ def _local_now(tzname):
 BASE = "https://home.solarmanpv.com"
 _CTX = ssl.create_default_context()
 
+# Manual nameplate overrides — Solarman's installedCapacity is a hand-entered
+# config field that doesn't always reflect reality. Овруч (id 66298046): 2400 kW
+# after the 2nd inverter's datalogger was added (the API still reports 2200).
+CAPACITY_KW = {66298046: 2400}
+
 # networkStatus -> dashboard status
 _STATUS = {
     "ALL_ONLINE": "connected",
@@ -195,7 +200,7 @@ class SolarmanClient:
 
     def _normalize(self, st):
         sid = st["id"]
-        cap = st.get("installedCapacity") or 0            # kW
+        cap = CAPACITY_KW.get(sid) or st.get("installedCapacity") or 0   # kW (manual override wins)
         now_kw = round((st.get("generationPower") or 0) / 1000.0, 2)  # W -> kW
         today_kwh = st.get("generationValue") or 0
         hist = self.get_history(st, st.get("startOperatingTime"))
