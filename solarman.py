@@ -3,10 +3,16 @@ Solarman Smart adapter (home.solarmanpv.com "maintain-s" web API).
 
 The station Овруч lives on Solarman, a THIRD platform. Its web login is behind a
 slider CAPTCHA (can't be automated), and the official OpenAPI needs an appId the
-account doesn't have. So instead we ride a long-lived bearer token (a JWT, ~2.5
-months validity) captured once from a browser session and stored as the
-SOLARMAN_TOKEN secret. When it eventually expires the Solarman block just drops
-(caught in collect.py) until the token is refreshed.
+account doesn't have. So instead we ride a JWT captured once from a browser
+session, stored as the SOLARMAN_TOKEN secret.
+
+Solarman's browser *access* token only lives ~1 day, but the *refresh* token
+lives ~6 months and its refresh grant is NOT captcha-gated. So SOLARMAN_TOKEN
+should hold the refresh token (the JWT that carries an "ati" claim); this adapter
+exchanges it for a fresh access token on every run via the OAuth token endpoint.
+A raw access token is still accepted (used directly) for backward compatibility.
+When the refresh token finally expires the Solarman block just drops (caught in
+collect.py) until it is re-captured from the browser.
 
 Endpoints (all under https://home.solarmanpv.com, Authorization: bearer <token>):
   POST /maintain-s/operating/station/search            {page,size}      -> stations (+ live summary)
@@ -15,6 +21,7 @@ Endpoints (all under https://home.solarmanpv.com, Authorization: bearer <token>)
   GET  /maintain-s/history/power/{id}/stats/year       ?year            -> monthly energy in a year + year total
   GET  /maintain-s/history/power/{id}/stats/total                       -> lifetime total
 """
+import base64
 import json
 import time
 import urllib.request
@@ -35,6 +42,21 @@ def _local_now(tzname):
 BASE = "https://home.solarmanpv.com"
 _CTX = ssl.create_default_context()
 
+# OAuth token endpoint + the fixed public web client (base64 of "test:test").
+# Used to exchange a long-lived refresh token for a short-lived access token.
+_OAUTH_TOKEN_PATH = "/oauth2-s/oauth/token"
+_OAUTH_BASIC = "Basic dGVzdDp0ZXN0"
+
+
+def _jwt_claims(jwt):
+    """Best-effort decode of a JWT payload (no signature check)."""
+    try:
+        p = jwt.split(".")[1]
+        p += "=" * (-len(p) % 4)
+        return json.loads(base64.urlsafe_b64decode(p))
+    except Exception:
+        return {}
+
 # Manual nameplate overrides — Solarman's installedCapacity is a hand-entered
 # config field that doesn't always reflect reality. Овруч (id 66298046): 2400 kW
 # after the 2nd inverter's datalogger was added (the API still reports 2200).
@@ -51,7 +73,40 @@ _STATUS = {
 
 class SolarmanClient:
     def __init__(self, token):
-        self.token = (token or "").strip()
+        raw = (token or "").strip()
+        self._raw = raw
+        # A refresh token carries an "ati" claim; a plain access token does not.
+        self._is_refresh = bool(_jwt_claims(raw).get("ati"))
+        # Resolved bearer used for maintain-s calls; if we already hold an
+        # access token, use it directly, otherwise it's minted on first request.
+        self._access = None if self._is_refresh else raw
+
+    # ---- auth --------------------------------------------------------------
+    def _ensure_token(self):
+        """Return a usable access token, exchanging the refresh token if needed."""
+        if self._access:
+            return self._access
+        data = urllib.parse.urlencode(
+            {"grant_type": "refresh_token", "refresh_token": self._raw}).encode()
+        req = urllib.request.Request(
+            BASE + _OAUTH_TOKEN_PATH, data=data, method="POST",
+            headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json",
+                     "Content-Type": "application/x-www-form-urlencoded",
+                     "Authorization": _OAUTH_BASIC})
+        try:
+            with urllib.request.urlopen(req, timeout=30, context=_CTX) as r:
+                j = json.loads(r.read().decode("utf-8", "ignore"))
+        except urllib.error.HTTPError as e:
+            raise RuntimeError(
+                f"Solarman refresh-token exchange rejected ({e.code}) — refresh SOLARMAN_TOKEN")
+        except Exception as e:
+            raise RuntimeError(f"Solarman token endpoint unreachable: {e}")
+        at = j.get("access_token")
+        if not at:
+            raise RuntimeError(
+                f"Solarman refresh returned no access_token ({str(j)[:100]}) — refresh SOLARMAN_TOKEN")
+        self._access = at
+        return at
 
     # ---- transport ---------------------------------------------------------
     def _req(self, method, path, params=None, body=None, retries=2, timeout=30):
@@ -61,7 +116,7 @@ class SolarmanClient:
         headers = {
             "User-Agent": "Mozilla/5.0",
             "Accept": "application/json",
-            "Authorization": "bearer " + self.token,
+            "Authorization": "bearer " + self._ensure_token(),
         }
         data = None
         if body is not None:
