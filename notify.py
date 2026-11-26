@@ -26,6 +26,7 @@ Env:
     DATA_FILE      path to data.json (default output/data.json)
 """
 import os
+import re
 import sys
 import json
 import html
@@ -265,6 +266,22 @@ def _save(path, state):
         json.dump(state, fh, ensure_ascii=False, indent=1, sort_keys=True)
 
 
+def _norm_chat(c):
+    """Normalize a chat id so '123' and 123 don't double-send; keep @channel strings."""
+    if c is None:
+        return None
+    if isinstance(c, int):
+        return c
+    s = str(c).strip()
+    if not s:
+        return None
+    return int(s) if re.fullmatch(r"-?\d+", s) else s
+
+
+WELCOME = ("✅ Ви підписані на сповіщення <b>Brenvel Solar</b>.\n"
+           "Надсилатиму аварії станцій (вдень) та звіти — день, тиждень, місяць.")
+
+
 def main(state_path):
     data_file = os.environ.get("DATA_FILE", os.path.join(HERE, "output", "data.json"))
     try:
@@ -286,23 +303,42 @@ def main(state_path):
     now = _kyiv_now()
     ctx = price_ctx(bundle, load_prices())
 
-    def deliver(msg):
-        return telegram.send(msg) or DRY
+    # ---- recipients: everyone who has messaged the bot (auto-subscribe) -------
+    # plus an optional TELEGRAM_CHAT_ID "seed" that is always included.
+    subs = {_norm_chat(c) for c in (state.get("subscribers") or [])}
+    subs.discard(None)
+    seed = _norm_chat(os.environ.get("TELEGRAM_CHAT_ID"))
+    try:
+        for cid in telegram.get_subscriber_ids():
+            cid = _norm_chat(cid)
+            if cid is not None and cid not in subs:
+                subs.add(cid)
+                telegram.send(WELCOME, chat_id=cid)   # greet each new subscriber
+    except Exception as e:
+        print(f"notify: subscriber refresh failed: {e}")
+    state["subscribers"] = sorted(c for c in subs if isinstance(c, int))
+    recipients = list(subs | ({seed} if seed is not None else set()))
 
-    # First activation: seed baseline health silently + greet, then stop
-    # (alerts/reports resume on the next cycle, so setup never bursts).
+    def broadcast(msg):
+        if not recipients:
+            telegram.broadcast(msg, [])            # prints a dry/no-recipients note
+            return DRY
+        delivered, dead = telegram.broadcast(msg, recipients)
+        if dead:
+            for d in dead:
+                subs.discard(_norm_chat(d))
+            state["subscribers"] = sorted(c for c in subs if isinstance(c, int))
+        return bool(delivered) or DRY
+
+    # First activation: seed baseline health silently, then stop (new subscribers
+    # were already welcomed above). Alerts/reports resume next cycle — no burst.
     if not state.get("activated"):
         _, entries = compute_alerts({}, bundle, ctx, now, emit=False)
         state["stations"] = entries
         state["activated"] = True
-        n = len(bundle["stations"])
-        deliver(
-            "✅ <b>Brenvel Solar</b> — бот підключено.\n"
-            f"Стежу за {n} станціями. Напишу, коли станція вдень зникне зі зв'язку "
-            f"або повернеться, і надсилатиму звіти: день о {REPORT_HOUR:02d}:00, "
-            "тиждень у понеділок, місяць 1-го числа.")
         _save(state_path, state)
-        print(f"notify: activated, baseline for {n} stations")
+        print(f"notify: activated, baseline for {len(bundle['stations'])} stations, "
+              f"{len(recipients)} recipient(s)")
         return
 
     sent = 0
@@ -313,20 +349,20 @@ def main(state_path):
         state["stations"] = entries          # no change to announce; keep health fresh
     else:
         header = "🛰 <b>Статус станцій</b>\n" if len(lines) > 1 else ""
-        if deliver(header + "\n".join(lines)):
+        if broadcast(header + "\n".join(lines)):
             state["stations"] = entries
             sent += 1
         # on failure: keep previous health so the alert retries next cycle
 
     # ---- reports ----
     for marker, value, msg in due_reports(bundle, state, ctx, now):
-        if deliver(msg):
+        if broadcast(msg):
             state[marker] = value
             sent += 1
 
     _save(state_path, state)
-    print(f"notify: {len(lines)} alert line(s), {sent} message(s) delivered"
-          + (" [dry-run]" if DRY else ""))
+    print(f"notify: {len(recipients)} recipient(s), {len(lines)} alert line(s), "
+          f"{sent} broadcast(s)" + (" [dry-run]" if DRY else ""))
 
 
 if __name__ == "__main__":

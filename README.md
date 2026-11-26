@@ -67,31 +67,31 @@ The same cloud loop also runs a Telegram bot (`notify.py`). It sends:
 - **Reports** — a daily digest (generation + revenue per station + fleet total) at
   **21:00** Kyiv, a weekly one on Mondays, and a monthly one on the 1st.
 
-The bot is **skipped unless** `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` secrets are set, so
-it is fully optional. Bot state (station health + last report dates — never generation or
-revenue numbers) is kept on an orphan `bot-state` branch so it survives across runs.
+The bot is **skipped unless** the `TELEGRAM_BOT_TOKEN` secret is set, so it is fully
+optional. **Recipients are automatic** — anyone who presses **Start** on the bot (or any
+group it is added to) is subscribed and gets every alert and report; chats that block or
+remove the bot are pruned automatically. Bot state (station health, the subscriber chat-id
+list, and last report dates — never generation or revenue numbers) is kept on an orphan
+`bot-state` branch so it survives across runs.
 
 **Setup:**
 
 1. **Create the bot** — in Telegram open **@BotFather** → `/newbot` → pick a name. It gives
    you a token like `123456789:AA...`.
-2. **Get the chat id** — press **Start** on your new bot (or add it to a group/channel and
-   post a message there; for a channel make the bot an admin). Then run locally:
-   ```bash
-   TELEGRAM_BOT_TOKEN=123456789:AA... python3 telegram.py chatid
-   ```
-   It prints the `chat_id` (a personal id is positive; a group/channel is negative).
-3. **Add 2 repository secrets** (*Settings → Secrets and variables → Actions*):
-   `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. *(Optional: a repo **variable** `REPORT_HOUR`,
-   0–23, changes the daily/weekly/monthly send hour — default 21.)*
-4. **Restart the loop** — *Actions → "Build & publish solar dashboard" → Run workflow*. On the
-   first cycle the bot sends a “✅ підключено” greeting; alerts and reports follow.
+2. **Add 1 repository secret** (*Settings → Secrets and variables → Actions*):
+   `TELEGRAM_BOT_TOKEN`. *(Optional: `TELEGRAM_CHAT_ID` to always include one specific chat
+   even before anyone subscribes; a repo **variable** `REPORT_HOUR`, 0–23, changes the
+   daily/weekly/monthly send hour — default 21.)*
+3. **Restart the loop** — *Actions → "Build & publish solar dashboard" → Run workflow*.
+4. **Subscribe** — in Telegram press **Start** on the bot (and/or add it to a team group and
+   send a message there). Within one cycle (~15 min) it welcomes each new subscriber, and
+   alerts/reports follow. Everyone who starts the bot is added automatically.
 
 Test the message wording without sending anything:
 
 ```bash
 TELEGRAM_DRY_RUN=1 python3 notify.py /tmp/bot_state.json     # prints alerts/reports
-TELEGRAM_BOT_TOKEN=.. TELEGRAM_CHAT_ID=.. python3 telegram.py test   # sends one test message
+python3 telegram.py chatid    # optional: paste token, see who has messaged the bot
 ```
 
 ### Notes

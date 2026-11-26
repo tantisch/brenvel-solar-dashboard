@@ -54,37 +54,26 @@ def _dry():
     return os.environ.get("TELEGRAM_DRY_RUN", "").lower() in ("1", "true", "yes")
 
 
-def send(text, token=None, chat_id=None, parse_mode="HTML", disable_preview=True):
-    """Send one message. Returns True only on a real, confirmed send.
-
-    In dry-run (or with no token/chat configured) the message is printed and
-    False is returned, so callers must treat dry-run state-advancement separately.
-    """
-    token = token or os.environ.get("TELEGRAM_BOT_TOKEN")
-    chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID")
-    if _dry() or not token or not chat_id:
-        why = "DRY_RUN" if _dry() else "no token/chat_id"
-        print("-" * 56)
-        print(f"[telegram {why} -> chat {chat_id or '?'}]\n{text}")
-        print("-" * 56)
-        return False
+def _deliver(token, chat_id, text, parse_mode="HTML", disable_preview=True):
+    """Deliver to one chat. Return 'ok', 'dead' (invalid/blocked chat — prune it),
+    or 'fail' (transient — keep and retry next cycle)."""
     params = {
         "chat_id": chat_id,
         "text": text,
         "parse_mode": parse_mode,
         "disable_web_page_preview": "true" if disable_preview else "false",
     }
-    for attempt in range(3):
+    for _ in range(3):
         try:
             j = _call(token, "sendMessage", params)
             if j.get("ok"):
-                return True
+                return "ok"
             ra = (j.get("parameters") or {}).get("retry_after")
             if ra:
                 time.sleep(min(int(ra) + 1, 30))
                 continue
-            print(f"   ! telegram sendMessage not ok: {str(j)[:150]}")
-            return False
+            print(f"   ! telegram not ok for {chat_id}: {str(j)[:120]}")
+            return "dead"
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", "ignore")
             ra = None
@@ -95,13 +84,61 @@ def send(text, token=None, chat_id=None, parse_mode="HTML", disable_preview=True
             if e.code == 429 and ra:
                 time.sleep(min(int(ra) + 1, 30))
                 continue
-            print(f"   ! telegram HTTP {e.code}: {body[:150]}")
-            if 400 <= e.code < 500:   # 4xx (bad token/chat) won't fix on retry
-                return False
+            # 400 chat not found / 403 bot blocked or kicked => stop messaging it
+            if e.code in (400, 403):
+                print(f"   ! telegram {e.code} for {chat_id}: {body[:100]}")
+                return "dead"
+            print(f"   ! telegram HTTP {e.code}: {body[:120]}")
         except Exception as e:
-            print(f"   ! telegram send failed: {e}")
+            print(f"   ! telegram send failed for {chat_id}: {e}")
         time.sleep(2)
-    return False
+    return "fail"
+
+
+def send(text, token=None, chat_id=None, parse_mode="HTML", disable_preview=True):
+    """Send one message to one chat. True only on a confirmed send (False in
+    dry-run / when token or chat is missing)."""
+    token = token or os.environ.get("TELEGRAM_BOT_TOKEN")
+    chat_id = chat_id if chat_id is not None else os.environ.get("TELEGRAM_CHAT_ID")
+    if _dry() or not token or chat_id in (None, ""):
+        why = "DRY_RUN" if _dry() else "no token/chat_id"
+        print("-" * 56)
+        print(f"[telegram {why} -> chat {chat_id if chat_id not in (None, '') else '?'}]\n{text}")
+        print("-" * 56)
+        return False
+    return _deliver(token, chat_id, text, parse_mode, disable_preview) == "ok"
+
+
+def broadcast(text, chat_ids, token=None, parse_mode="HTML", disable_preview=True):
+    """Send the same message to many chats. Return (delivered_count, dead_ids),
+    where dead_ids are chats the caller should drop (blocked bot / chat gone)."""
+    token = token or os.environ.get("TELEGRAM_BOT_TOKEN")
+    ids, seen = [], set()
+    for c in chat_ids:                       # de-dup, keep order, drop blanks
+        if c in (None, "") or c in seen:
+            continue
+        seen.add(c)
+        ids.append(c)
+    if _dry() or not token or not ids:
+        why = "DRY_RUN" if _dry() else ("no token" if not token else "no recipients")
+        print("-" * 56)
+        print(f"[telegram {why} -> {len(ids)} chat(s)]\n{text}")
+        print("-" * 56)
+        return (0, [])
+    delivered, dead = 0, []
+    for cid in ids:
+        st = _deliver(token, cid, text, parse_mode, disable_preview)
+        if st == "ok":
+            delivered += 1
+        elif st == "dead":
+            dead.append(cid)
+        time.sleep(0.04)                     # stay well under Telegram's ~30 msg/s
+    return (delivered, dead)
+
+
+def get_subscriber_ids(token=None):
+    """Chat ids that have messaged the bot recently (for auto-subscribe)."""
+    return [cid for cid, _ in get_chat_ids(token)]
 
 
 def get_chat_ids(token=None):

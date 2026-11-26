@@ -90,7 +90,7 @@ jobs:
             # State (station health + last report dates — nothing sensitive)
             # lives on the orphan `bot-state` branch so it survives across runs.
             # Isolated in its own subshell: a Telegram hiccup never breaks deploy.
-            if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+            if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
               (
                 TMP="${RUNNER_TEMP:-/tmp}"; ST="$TMP/bot_state.json"
                 if git fetch -q origin bot-state 2>/dev/null; then
