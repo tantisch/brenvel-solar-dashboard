@@ -256,15 +256,39 @@ class SolarmanClient:
     def _normalize(self, st):
         sid = st["id"]
         cap = CAPACITY_KW.get(sid) or st.get("installedCapacity") or 0   # kW (manual override wins)
-        now_kw = round((st.get("generationPower") or 0) / 1000.0, 2)  # W -> kW
+        tz = st.get("regionTimezone") or "Europe/Kyiv"
+        status = _STATUS.get(st.get("networkStatus"), "unknown")
+        if status == "connected" and st.get("warningStatus") not in (None, "NORMAL"):
+            status = "trouble"
+
+        # Solarman keeps serving the LAST-KNOWN live snapshot frozen in place, so a
+        # plant whose datalogger went offline still reports its last generationPower
+        # (can be DAYS stale — e.g. Овруч read 25.79 kW while offline ~12 days). Use
+        # lastUpdateTime to avoid presenting a dead plant as generating.
+        now = _local_now(tz)
+        last = st.get("lastUpdateTime")
+        age = (now.timestamp() - float(last)) if last else None
+        stale = age is not None and age > 7200           # >2h since the last report
+        if stale and status == "connected":
+            status = "disconnected"
+        offline = status == "disconnected" or stale
+
+        now_kw = 0.0 if offline else round((st.get("generationPower") or 0) / 1000.0, 2)
         today_kwh = st.get("generationValue") or 0
+        if last:                                         # a frozen snapshot from an
+            try:                                         # earlier day isn't today's
+                from zoneinfo import ZoneInfo
+                if datetime.fromtimestamp(float(last), ZoneInfo(tz)).date() != now.date():
+                    today_kwh = 0
+            except Exception:
+                if stale:
+                    today_kwh = 0
+        today_rev = 0 if not today_kwh else st.get("incomeValue")
+
         hist = self.get_history(st, st.get("startOperatingTime"))
         total_kwh = hist["total_kwh"] or st.get("generationTotal") or 0
         total_rev = hist["total_rev"]
         eur_kwh = round(total_rev / total_kwh, 4) if (total_rev and total_kwh) else None
-        status = _STATUS.get(st.get("networkStatus"), "unknown")
-        if status == "connected" and st.get("warningStatus") not in (None, "NORMAL"):
-            status = "trouble"
         rec = {
             "name": st.get("name") or "Solarman",
             "source": "solarman",
@@ -275,7 +299,7 @@ class SolarmanClient:
             "today": {"metered": False, "pv": today_kwh},
             "today_kwh": today_kwh,
             "total_kwh": total_kwh,
-            "today_rev": st.get("incomeValue"),
+            "today_rev": today_rev,
             "total_rev": total_rev,
             "eur_kwh": eur_kwh,
             "lat": st.get("locationLat"),

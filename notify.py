@@ -230,9 +230,16 @@ def due_reports(bundle, state, ctx, now):
     today = now.strftime("%Y-%m-%d")
     if state.get("last_daily") != today:
         rows, tp, tr = _rows(bundle, ctx, today_pv)
-        down = [ctx["disp"].get(s["name"], s["name"])
-                for s in bundle["stations"] if (s.get("status") in BAD)]
-        extra = ("⚠️ Зараз не на зв'язку: " + ", ".join(esc(d) for d in down)) if down else None
+        offline = [ctx["disp"].get(s["name"], s["name"]) for s in bundle["stations"]
+                   if s.get("status") in ("disconnected", "unknown")]
+        warn = [ctx["disp"].get(s["name"], s["name"]) for s in bundle["stations"]
+                if s.get("status") == "trouble"]
+        parts = []
+        if offline:
+            parts.append("🔴 Офлайн: " + ", ".join(esc(d) for d in offline))
+        if warn:
+            parts.append("🟡 Аварія/попередження: " + ", ".join(esc(d) for d in warn))
+        extra = "\n".join(parts) if parts else None
         out.append(("last_daily", today,
                     _report("Звіт за день", now.strftime("%d.%m.%Y"), rows, tp, tr, fx, extra)))
 
