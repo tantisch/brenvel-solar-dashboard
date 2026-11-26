@@ -43,6 +43,11 @@ jobs:
           NETECO_PASSWORD: ${{ secrets.NETECO_PASSWORD }}
           SOLARMAN_TOKEN: ${{ secrets.SOLARMAN_TOKEN }}
           STATICRYPT_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+          # Telegram bot (fault alerts + daily/weekly/monthly reports). The bot
+          # is simply skipped if these two secrets are not set.
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          REPORT_HOUR: ${{ vars.REPORT_HOUR || '21' }}
           GH_TOKEN: ${{ github.token }}
           REPO_SLUG: ${{ github.repository }}
         run: |
@@ -79,6 +84,31 @@ jobs:
               git -c user.email=actions@github.com -c user.name="solar-bot" commit -q -m "update $(date -u +%FT%TZ)"
               git push -q -f "$REPO" gh-pages
             ) && echo "published cycle $n" || echo "cycle $n failed; previous version kept live"
+
+            # --- Telegram bot: fault alerts + day/week/month reports ---------
+            # Runs on the fresh output/data.json from build_dashboard.py above.
+            # State (station health + last report dates — nothing sensitive)
+            # lives on the orphan `bot-state` branch so it survives across runs.
+            # Isolated in its own subshell: a Telegram hiccup never breaks deploy.
+            if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+              (
+                TMP="${RUNNER_TEMP:-/tmp}"; ST="$TMP/bot_state.json"
+                if git fetch -q origin bot-state 2>/dev/null; then
+                  git show FETCH_HEAD:bot_state.json > "$ST" 2>/dev/null || echo '{}' > "$ST"
+                else
+                  echo '{}' > "$ST"
+                fi
+                BEFORE=$(cat "$ST" 2>/dev/null || echo '{}')
+                python notify.py "$ST" || echo "notify.py errored"
+                if [ "$(cat "$ST" 2>/dev/null)" != "$BEFORE" ]; then
+                  sd="$TMP/botstate"; rm -rf "$sd"; mkdir -p "$sd"; cp "$ST" "$sd/bot_state.json"
+                  ( cd "$sd" && git init -q && git checkout -q -b bot-state && git add -A \
+                    && git -c user.email=actions@github.com -c user.name="solar-bot" \
+                         commit -q -m "state $(date -u +%FT%TZ)" \
+                    && git push -q -f "$REPO" bot-state ) || echo "bot-state push failed"
+                fi
+              ) || echo "telegram notifier skipped (error)"
+            fi
             echo "::endgroup::"
             EL=$(( $(date +%s) - START )); S=$(( 900 - EL )); [ "$S" -lt 30 ] && S=30
             echo "next cycle in ${S}s"; sleep "$S"

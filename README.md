@@ -14,6 +14,8 @@ All 5 locations appear in one unified view (no region split).
 | `collect.py` | Pulls the full dataset for every station → `output/data.json`. |
 | `site_template.html` | The dashboard UI (overview + per-location deep-dive, Chart.js). Data is injected at build time. |
 | `build_dashboard.py` | Runs `collect.py` and injects the data into the template → `output/dashboard.html` (self-contained). |
+| `notify.py` | Telegram bot brain: fault alerts (day-only) + daily/weekly/monthly reports from `output/data.json`. |
+| `telegram.py` | Tiny stdlib Telegram Bot API client (`send`, plus `chatid`/`test` setup helpers). |
 | `export_stations.py` | A flat CSV snapshot of all stations in `output/`. |
 | `.github/workflows/dashboard.yml` | Cloud job (schedule + on push) that builds, encrypts, and publishes the dashboard. |
 | `.env` | Your FusionSolar login (gitignored — never committed). |
@@ -54,6 +56,43 @@ Secrets, and `.env` is gitignored.
    It looks like `https://<your-user>.github.io/<repo>/`.
 5. Done — it now rebuilds every 30 minutes during daylight. Share the URL + the
    `DASHBOARD_PASSWORD` with your team.
+
+## Telegram bot (alerts + reports)
+
+The same cloud loop also runs a Telegram bot (`notify.py`). It sends:
+
+- **Fault alerts** — when a station drops to *disconnected / warning* **during the day**
+  (while the rest of the fleet is generating, or 09:00–16:00), and a **recovery** note when
+  it returns. Nightly inverter sleep never alerts, so there is no night/morning spam.
+- **Reports** — a daily digest (generation + revenue per station + fleet total) at
+  **21:00** Kyiv, a weekly one on Mondays, and a monthly one on the 1st.
+
+The bot is **skipped unless** `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` secrets are set, so
+it is fully optional. Bot state (station health + last report dates — never generation or
+revenue numbers) is kept on an orphan `bot-state` branch so it survives across runs.
+
+**Setup:**
+
+1. **Create the bot** — in Telegram open **@BotFather** → `/newbot` → pick a name. It gives
+   you a token like `123456789:AA...`.
+2. **Get the chat id** — press **Start** on your new bot (or add it to a group/channel and
+   post a message there; for a channel make the bot an admin). Then run locally:
+   ```bash
+   TELEGRAM_BOT_TOKEN=123456789:AA... python3 telegram.py chatid
+   ```
+   It prints the `chat_id` (a personal id is positive; a group/channel is negative).
+3. **Add 2 repository secrets** (*Settings → Secrets and variables → Actions*):
+   `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. *(Optional: a repo **variable** `REPORT_HOUR`,
+   0–23, changes the daily/weekly/monthly send hour — default 21.)*
+4. **Restart the loop** — *Actions → "Build & publish solar dashboard" → Run workflow*. On the
+   first cycle the bot sends a “✅ підключено” greeting; alerts and reports follow.
+
+Test the message wording without sending anything:
+
+```bash
+TELEGRAM_DRY_RUN=1 python3 notify.py /tmp/bot_state.json     # prints alerts/reports
+TELEGRAM_BOT_TOKEN=.. TELEGRAM_CHAT_ID=.. python3 telegram.py test   # sends one test message
+```
 
 ### Notes
 - **Change the schedule** in `.github/workflows/dashboard.yml` (the `cron` line). Times are
