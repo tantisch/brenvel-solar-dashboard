@@ -68,24 +68,26 @@ The same cloud loop also runs a Telegram bot (`notify.py`). It sends:
   **21:00** Kyiv, a weekly one on Mondays, and a monthly one on the 1st.
 
 The bot is **skipped unless** the `TELEGRAM_BOT_TOKEN` secret is set, so it is fully
-optional. **Recipients are automatic** — anyone who presses **Start** on the bot (or any
-group it is added to) is subscribed and gets every alert and report; chats that block or
-remove the bot are pruned automatically. Bot state (station health, the subscriber chat-id
-list, and last report dates — never generation or revenue numbers) is kept on an orphan
-`bot-state` branch so it survives across runs.
+optional. **Recipients are password-gated** — to subscribe, a person sends the bot the
+access password (`TELEGRAM_BOT_PASSWORD`); until they do, the bot only asks for it. Once
+subscribed they get every alert and report, and chats that block/remove the bot are pruned
+automatically. The password lives in a secret (never in this public repo). Bot state
+(station health, the subscriber chat-id list, the update offset, and last report dates —
+never generation or revenue numbers) is kept on an orphan `bot-state` branch so it survives
+across runs.
 
 **Setup:**
 
 1. **Create the bot** — in Telegram open **@BotFather** → `/newbot` → pick a name. It gives
    you a token like `123456789:AA...`.
-2. **Add 1 repository secret** (*Settings → Secrets and variables → Actions*):
-   `TELEGRAM_BOT_TOKEN`. *(Optional: `TELEGRAM_CHAT_ID` to always include one specific chat
-   even before anyone subscribes; a repo **variable** `REPORT_HOUR`, 0–23, changes the
-   daily/weekly/monthly send hour — default 21.)*
+2. **Add 2 repository secrets** (*Settings → Secrets and variables → Actions*):
+   `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_PASSWORD` (the access password people will send to
+   subscribe). *(Optional: `TELEGRAM_CHAT_ID` to always include one specific chat; a repo
+   **variable** `REPORT_HOUR`, 0–23, changes the daily/weekly/monthly send hour — default 21.)*
 3. **Restart the loop** — *Actions → "Build & publish solar dashboard" → Run workflow*.
-4. **Subscribe** — in Telegram press **Start** on the bot (and/or add it to a team group and
-   send a message there). Within one cycle (~15 min) it welcomes each new subscriber, and
-   alerts/reports follow. Everyone who starts the bot is added automatically.
+4. **Subscribe** — in Telegram press **Start** on the bot and **send it the password** (or add
+   it to a team group and send the password there). Within one cycle (~15 min) it confirms
+   and alerts/reports follow. Each person who sends the correct password is added.
 
 Test the message wording without sending anything:
 

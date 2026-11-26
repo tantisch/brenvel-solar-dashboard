@@ -141,6 +141,40 @@ def get_subscriber_ids(token=None):
     return [cid for cid, _ in get_chat_ids(token)]
 
 
+def poll_updates(token=None, offset=0):
+    """Consume incoming messages exactly once via the getUpdates offset.
+    Return (next_offset, [(chat_id, text), ...]). Passing the returned
+    next_offset on the following call confirms (drops) the updates read here."""
+    token = token or os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not token:
+        return (offset, [])
+    params = {"timeout": 0, "allowed_updates": json.dumps(["message", "channel_post"])}
+    if offset:
+        params["offset"] = offset
+    try:
+        j = _call(token, "getUpdates", params)
+    except urllib.error.HTTPError as e:
+        print("   ! telegram getUpdates 401 — token rejected" if e.code == 401
+              else f"   ! telegram getUpdates HTTP {e.code}")
+        return (offset, [])
+    except Exception as e:
+        print(f"   ! telegram getUpdates failed: {e}")
+        return (offset, [])
+    out, nxt = [], offset
+    for u in j.get("result", []):
+        uid = u.get("update_id")
+        if isinstance(uid, int) and uid >= nxt:
+            nxt = uid + 1
+        m = u.get("message") or u.get("channel_post")
+        if not m:
+            continue
+        cid = (m.get("chat") or {}).get("id")
+        if cid is None:
+            continue
+        out.append((cid, m.get("text") or m.get("caption") or ""))
+    return (nxt, out)
+
+
 def get_chat_ids(token=None):
     """Return [(chat_id, label)] for chats seen in recent updates (setup aid)."""
     token = token or os.environ.get("TELEGRAM_BOT_TOKEN")

@@ -46,6 +46,7 @@ jobs:
           # Telegram bot (fault alerts + daily/weekly/monthly reports). The bot
           # is simply skipped if these two secrets are not set.
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_BOT_PASSWORD: ${{ secrets.TELEGRAM_BOT_PASSWORD }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           REPORT_HOUR: ${{ vars.REPORT_HOUR || '21' }}
           GH_TOKEN: ${{ github.token }}

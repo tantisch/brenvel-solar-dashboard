@@ -20,8 +20,10 @@ Usage:
     TELEGRAM_DRY_RUN=1 python notify.py <state.json>        # print, don't send
 
 Env:
-    TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID   delivery target
-    TELEGRAM_DRY_RUN                         print instead of sending
+    TELEGRAM_BOT_TOKEN      bot token (required)
+    TELEGRAM_BOT_PASSWORD   access password: a chat must send it to subscribe
+    TELEGRAM_CHAT_ID        optional always-included chat (owner seed)
+    TELEGRAM_DRY_RUN        print instead of sending
     REPORT_HOUR    local hour 0-23 for day/week/month reports (default 21)
     DATA_FILE      path to data.json (default output/data.json)
 """
@@ -278,8 +280,10 @@ def _norm_chat(c):
     return int(s) if re.fullmatch(r"-?\d+", s) else s
 
 
-WELCOME = ("✅ Ви підписані на сповіщення <b>Brenvel Solar</b>.\n"
+WELCOME = ("✅ Доступ надано — ви підписані на сповіщення <b>Brenvel Solar</b>.\n"
            "Надсилатиму аварії станцій (вдень) та звіти — день, тиждень, місяць.")
+PASSWORD_PROMPT = ("🔒 Вітаю! Щоб отримувати сповіщення <b>Brenvel Solar</b>, "
+                   "надішліть пароль доступу одним повідомленням.")
 
 
 def main(state_path):
@@ -303,19 +307,31 @@ def main(state_path):
     now = _kyiv_now()
     ctx = price_ctx(bundle, load_prices())
 
-    # ---- recipients: everyone who has messaged the bot (auto-subscribe) -------
-    # plus an optional TELEGRAM_CHAT_ID "seed" that is always included.
+    # ---- recipients: chats that subscribed with the access password ----------
+    # A chat must send the correct TELEGRAM_BOT_PASSWORD to be added; until then
+    # the bot only asks for it. An optional TELEGRAM_CHAT_ID "seed" is always
+    # included (the owner, configured via a trusted secret — no password needed).
     subs = {_norm_chat(c) for c in (state.get("subscribers") or [])}
     subs.discard(None)
     seed = _norm_chat(os.environ.get("TELEGRAM_CHAT_ID"))
+    password = (os.environ.get("TELEGRAM_BOT_PASSWORD") or "").strip()
+    offset = int(state.get("update_offset") or 0)
     try:
-        for cid in telegram.get_subscriber_ids():
+        new_offset, incoming = telegram.poll_updates(offset=offset)
+        for cid, text in incoming:
             cid = _norm_chat(cid)
-            if cid is not None and cid not in subs:
+            if cid is None or cid in subs:
+                continue                       # already subscribed => ignore
+            if not password or text.strip() == password:
                 subs.add(cid)
-                telegram.send(WELCOME, chat_id=cid)   # greet each new subscriber
+                telegram.send(WELCOME, chat_id=cid)          # access granted
+            else:
+                telegram.send(PASSWORD_PROMPT, chat_id=cid)  # wrong/no password
+        state["update_offset"] = new_offset
     except Exception as e:
-        print(f"notify: subscriber refresh failed: {e}")
+        print(f"notify: update poll failed: {e}")
+    if not password:
+        print("notify: WARNING TELEGRAM_BOT_PASSWORD not set — bot subscribes anyone who writes")
     state["subscribers"] = sorted(c for c in subs if isinstance(c, int))
     recipients = list(subs | ({seed} if seed is not None else set()))
 
