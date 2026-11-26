@@ -14,6 +14,7 @@ CLI (setup helpers):
   python telegram.py test     # send a test message to TELEGRAM_CHAT_ID
 """
 import os
+import re
 import sys
 import ssl
 import json
@@ -22,8 +23,22 @@ import urllib.request
 import urllib.parse
 import urllib.error
 
+# Optional: load TELEGRAM_* from a local .env for convenience (no-op in CI /
+# if python-dotenv isn't installed). Shell-provided env vars still win.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+except Exception:
+    pass
+
 API = "https://api.telegram.org/bot{token}/{method}"
 _CTX = ssl.create_default_context()
+# A real BotFather token is "<digits>:<base64-ish>" and ASCII-only.
+_TOKEN_RE = re.compile(r"^\d{5,}:[A-Za-z0-9_-]{20,}$")
+
+
+def valid_token(t):
+    return bool(t and _TOKEN_RE.match(t.strip()))
 
 
 def _call(token, method, params, timeout=30):
@@ -98,6 +113,12 @@ def get_chat_ids(token=None):
         j = _call(token, "getUpdates",
                   {"timeout": 0, "allowed_updates":
                       json.dumps(["message", "channel_post", "my_chat_member", "edited_message"])})
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            print("❌ Токен не підходить (401). Перевір, що скопіював його повністю з @BotFather.")
+        else:
+            print(f"getUpdates failed: HTTP {e.code}")
+        return []
     except Exception as e:
         print(f"getUpdates failed: {e}")
         return []
@@ -118,21 +139,48 @@ def get_chat_ids(token=None):
     return list(seen.items())
 
 
+def _ask_token():
+    """Use TELEGRAM_BOT_TOKEN if already valid, otherwise prompt to paste it."""
+    t = (os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip()
+    if valid_token(t):
+        return t
+    if not sys.stdin.isatty():
+        return t
+    try:
+        t = input("\nВстав токен від @BotFather і натисни Enter:\n> ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return ""
+    return t
+
+
 if __name__ == "__main__":
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "test"
-    if cmd == "chatid":
-        ids = get_chat_ids()
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "chatid"
+
+    if cmd in ("chatid", "setup"):
+        token = _ask_token()
+        if not valid_token(token):
+            print("❌ Це не схоже на токен. Він має виглядати як 123456789:AAHxxxxxxxx...\n"
+                  "   Створи бота в @BotFather (/newbot) і скопіюй токен ПОВНІСТЮ.")
+            sys.exit(1)
+        ids = get_chat_ids(token)
+        if not ids and sys.stdin.isatty():
+            try:
+                input("\nТепер відкрий свого бота в Telegram і натисни Start "
+                      "(або додай його в групу/канал і напиши там).\n"
+                      "Коли зробиш — натисни Enter тут… ")
+            except (EOFError, KeyboardInterrupt):
+                pass
+            ids = get_chat_ids(token)
         if not ids:
-            print("Жодного чату не знайдено.\n"
-                  "1) Відкрий Telegram, знайди свого бота за ім'ям і натисни Start (або додай "
-                  "його в групу й напиши там будь-яке повідомлення).\n"
-                  "2) Запусти цю команду ще раз — вона покаже chat_id.")
+            print("\nПоки не бачу повідомлень боту. Напиши йому /start і запусти ще раз:  python3 telegram.py")
         else:
-            print("Знайдені чати (візьми потрібний chat_id):")
+            print("\n✅ Ось що знайшов — візьми потрібний chat_id:")
             for cid, label in ids:
-                print(f"  chat_id = {cid}    {label}")
+                print(f"   chat_id = {cid}    {label}")
+            print("\nДалі збережи два секрети: TELEGRAM_BOT_TOKEN (токен) і TELEGRAM_CHAT_ID (цей id).")
     elif cmd == "test":
-        ok = send("✅ <b>Brenvel Solar</b> — тестове повідомлення. Бот працює.")
+        ok = send("✅ <b>Brenvel Solar</b> — тестове повідомлення. Бот працює.",
+                  token=_ask_token())
         print("sent" if ok else "not sent (dry-run, or token/chat missing / error)")
     else:
-        print("usage: python telegram.py [test|chatid]")
+        print("usage: python3 telegram.py [chatid|test]")
