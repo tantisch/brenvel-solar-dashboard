@@ -20,7 +20,11 @@ CAPACITY_KW = {
     # "Brenvei_K.K_navis": 150,
 }
 
-TZ = timezone(timedelta(hours=3))   # Ukraine (EEST)
+try:                                  # real Kyiv time: UTC+2 winter / +3 summer
+    from zoneinfo import ZoneInfo
+    TZ = ZoneInfo("Europe/Kyiv")
+except Exception:
+    TZ = timezone(timedelta(hours=2))
 def _ms(dt): return int(dt.timestamp() * 1000)
 def _num(v, d=0.0):
     try:

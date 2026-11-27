@@ -227,13 +227,21 @@ class RegionSession:
         """Today's intraday PV vs load curve (metered sites). Returns the full
         24h 5-min timeline [{t:'HH:MM', pv:kW|None, load:kW|None}]. Must query
         with queryTime = start-of-day (else only the last hour is returned)."""
-        tz = timezone(timedelta(hours=3))
-        day0 = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        # Real Kyiv time (UTC+2 in winter, +3 in summer). A hardcoded +3 made
+        # day0 fall on 23:00 of the previous day in winter, so the server
+        # returned the wrong day's curve.
+        try:
+            from zoneinfo import ZoneInfo
+            now = datetime.now(ZoneInfo("Europe/Kyiv"))
+        except Exception:
+            now = datetime.now(timezone(timedelta(hours=2)))
+        day0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        off_h = int(now.utcoffset().total_seconds() // 3600)
         r = self._request(
             "GET", "/rest/pvms/web/station/v1/overview/energy-balance",
             params={"stationDn": station_dn, "timeDim": 2,
                     "queryTime": int(day0.timestamp() * 1000),
-                    "timeZone": 3, "timeZoneStr": "Europe/Kiev", "_": _now_ms()},
+                    "timeZone": off_h, "timeZoneStr": "Europe/Kiev", "_": _now_ms()},
         )
         d = r.json().get("data", {}) or {}
         xs, pv, load = d.get("xAxis", []), d.get("productPower", []), d.get("usePower", [])
