@@ -213,7 +213,8 @@ class SolarmanClient:
                 daily.append({"label": f"{rec['year']:04d}-{rec['month']:02d}-{dd:02d}",
                               "pv": rec.get("generationValue") or 0,
                               "rev": rec.get("incomeValue")})
-        out["daily"] = daily
+        # the API returns a month's days out of order (e.g. 04..09 after 31) -> sort
+        out["daily"] = sorted({d["label"]: d for d in daily}.values(), key=lambda d: d["label"])
 
         # monthly + yearly: one stats/year call per year gives monthly records + the year total
         monthly, yearly = [], []
@@ -230,8 +231,8 @@ class SolarmanClient:
             stt = r.get("statistics") or {}
             yearly.append({"label": f"{yy:04d}", "pv": stt.get("generationValue") or 0,
                            "rev": stt.get("incomeValue")})
-        out["monthly"] = monthly
-        out["yearly"] = yearly
+        out["monthly"] = sorted({d["label"]: d for d in monthly}.values(), key=lambda d: d["label"])
+        out["yearly"] = sorted(yearly, key=lambda d: d["label"])
 
         # lifetime total
         try:
@@ -304,7 +305,8 @@ class SolarmanClient:
             "eur_kwh": eur_kwh,
             "lat": st.get("locationLat"),
             "lon": st.get("locationLng"),
-            "address": st.get("locationAddress"),
+            # Solarman fills empty address parts with the literal "(null)"
+            "address": " ".join(w for w in (st.get("locationAddress") or "").replace("(null)", " ").split() if w != "null"),
             "device_num": None,
             "today_curve": hist["today_curve"],
             "daily": hist["daily"],
