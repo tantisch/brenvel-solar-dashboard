@@ -1,0 +1,19 @@
+name = "brenvel-solar-bot"
+main = "worker.js"
+account_id = "69fdcc4ab632f1237581e3afb943d184"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+# Encrypted live status file, published to the bot-state branch by GitHub Actions.
+[vars]
+DATA_URL = "https://raw.githubusercontent.com/tantisch/brenvel-solar-dashboard/bot-state/status.enc"
+
+# Subscribers (Worker-managed).
+kv_namespaces = [
+  { binding = "SOLAR_STATE", id = "555e58b147e34526823da3d881fb5e01" }
+]
+
+# Secrets (set with `wrangler secret put`, never committed):
+#   BOT_TOKEN       Telegram bot token
+#   BOT_PASSWORD    access password to subscribe
+#   WEBHOOK_SECRET  Telegram webhook secret token

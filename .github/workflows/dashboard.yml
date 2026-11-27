@@ -99,15 +99,19 @@ jobs:
                 else
                   echo '{}' > "$ST"
                 fi
-                BEFORE=$(cat "$ST" 2>/dev/null || echo '{}')
                 python notify.py "$ST" || echo "notify.py errored"
-                if [ "$(cat "$ST" 2>/dev/null)" != "$BEFORE" ]; then
-                  sd="$TMP/botstate"; rm -rf "$sd"; mkdir -p "$sd"; cp "$ST" "$sd/bot_state.json"
-                  ( cd "$sd" && git init -q && git checkout -q -b bot-state && git add -A \
-                    && git -c user.email=actions@github.com -c user.name="solar-bot" \
-                         commit -q -m "state $(date -u +%FT%TZ)" \
-                    && git push -q -f "$REPO" bot-state ) || echo "bot-state push failed"
-                fi
+                # Live status for the Cloudflare /status bot: build the snapshot and
+                # encrypt it with the dashboard password (the public branch keeps no
+                # plaintext fleet data; the Worker decrypts with the same password).
+                python notify.py snapshot "$TMP/status.json" \
+                  && DATA_PASSWORD="$STATICRYPT_PASSWORD" python cryptoutil.py enc "$TMP/status.json" > "$TMP/status.enc" \
+                  || echo "status snapshot/encrypt failed"
+                sd="$TMP/botstate"; rm -rf "$sd"; mkdir -p "$sd"; cp "$ST" "$sd/bot_state.json"
+                [ -s "$TMP/status.enc" ] && cp "$TMP/status.enc" "$sd/status.enc"
+                ( cd "$sd" && git init -q && git checkout -q -b bot-state && git add -A \
+                  && git -c user.email=actions@github.com -c user.name="solar-bot" \
+                       commit -q -m "state $(date -u +%FT%TZ)" \
+                  && git push -q -f "$REPO" bot-state ) || echo "bot-state push failed"
               ) || echo "telegram notifier skipped (error)"
             fi
             echo "::endgroup::"

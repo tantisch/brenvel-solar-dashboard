@@ -220,6 +220,34 @@ def _report(title, subtitle, rows, tp, tr, fx, extra=None):
     return "\n".join(out)
 
 
+def build_snapshot(bundle, ctx):
+    """Compact current-state snapshot for the Cloudflare /status bot (KV `snapshot`)."""
+    stations, tnow, tpv, trev = [], 0.0, 0.0, 0.0
+    for s in bundle["stations"]:
+        nm = s["name"]
+        nk = float(s.get("now_kw") or 0)
+        pv = today_pv(s)
+        rev = income_eur(nm, pv, ctx)
+        stations.append({
+            "name": ctx["disp"].get(nm, nm),
+            "status": s.get("status") or "unknown",
+            "now_kw": round(nk, 1),
+            "today_pv": round(pv, 1),
+            "today_rev": round(rev, 2),
+        })
+        tnow += nk
+        tpv += pv
+        trev += rev
+    rank = {"connected": 0, "trouble": 1}
+    stations.sort(key=lambda x: (rank.get(x["status"], 2), -x["now_kw"]))
+    return {
+        "updated": bundle.get("updated", ""),
+        "fx": ctx["fx"],
+        "stations": stations,
+        "totals": {"now_kw": round(tnow, 1), "today_pv": round(tpv, 1), "today_rev": round(trev, 2)},
+    }
+
+
 def due_reports(bundle, state, ctx, now):
     """Return [(state_marker, value, message)] for every report currently due."""
     out, fx = [], ctx["fx"]
@@ -389,7 +417,16 @@ def main(state_path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("usage: python notify.py <state.json>")
+    if len(sys.argv) >= 3 and sys.argv[1] == "snapshot":
+        # Build the compact /status snapshot from output/data.json -> <out.json>
+        data_file = os.environ.get("DATA_FILE", os.path.join(HERE, "output", "data.json"))
+        b = json.load(open(data_file, encoding="utf-8"))
+        snap = build_snapshot(b, price_ctx(b, load_prices()))
+        with open(sys.argv[2], "w", encoding="utf-8") as fh:
+            json.dump(snap, fh, ensure_ascii=False)
+        print(f"snapshot: {len(snap['stations'])} stations -> {sys.argv[2]}")
+    elif len(sys.argv) >= 2:
+        main(sys.argv[1])
+    else:
+        print("usage: python notify.py <state.json> | snapshot <out.json>")
         sys.exit(2)
-    main(sys.argv[1])
