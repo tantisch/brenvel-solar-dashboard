@@ -2,7 +2,7 @@ name: Build & publish solar dashboard
 
 # GitHub throttles frequent `schedule` crons heavily (it often fires only every
 # ~2h). So instead of relying on the scheduler for cadence, a single run LOOPS
-# internally — rebuilding and republishing every ~15 minutes — and deploys by
+# internally — rebuilding and republishing every ~5 minutes — and deploys by
 # pushing the encrypted page to the `gh-pages` branch (served by GitHub Pages).
 # The schedule/dispatch just (re)starts the loop if it ever stops. The
 # concurrency group guarantees only one loop is ever running.
@@ -115,7 +115,9 @@ jobs:
               ) || echo "telegram notifier skipped (error)"
             fi
             echo "::endgroup::"
-            EL=$(( $(date +%s) - START )); S=$(( 900 - EL )); [ "$S" -lt 30 ] && S=30
+            # Stations report every 5 min (inverter/datalogger native interval),
+            # so cycle every ~5 min — as live as the source gets.
+            EL=$(( $(date +%s) - START )); S=$(( 300 - EL )); [ "$S" -lt 20 ] && S=20
             echo "next cycle in ${S}s"; sleep "$S"
           done
           echo "loop window elapsed; exiting (schedule/dispatch will restart it)"
