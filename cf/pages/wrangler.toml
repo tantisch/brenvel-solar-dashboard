@@ -1,0 +1,20 @@
+# Brenvel Solar — standalone Cloudflare Pages project (https://brenvel-solar.pages.dev)
+#   public/            the dashboard page (no data inside)
+#   functions/data.js  GET /data  — password-gated live data for the page
+#   functions/tg.js    POST /tg   — Telegram bot webhook (/status, password gate)
+#
+# Deploy (wrangler 3 — wrangler 4 turns Pages commands into Workers):
+#   cd cf/pages && npx wrangler@3 pages deploy --branch main
+# Secrets (once): npx wrangler@3 pages secret put <NAME> --project-name brenvel-solar
+#   DATA_KEY, BOT_TOKEN, BOT_PASSWORD, WEBHOOK_SECRET
+name = "brenvel-solar"
+pages_build_output_dir = "./public"
+compatibility_date = "2025-01-01"
+
+# kv_namespaces must stay ABOVE [vars] (TOML would nest it under vars otherwise)
+kv_namespaces = [
+  { binding = "SOLAR_STATE", id = "555e58b147e34526823da3d881fb5e01" }
+]
+
+[vars]
+OWNER_CHATS = "1081188172"
