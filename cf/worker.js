@@ -99,8 +99,8 @@ async function getSnapshot(env) {
   const now = Date.now();
   if (_cache.data && now - _cache.at < 60000) return _cache.data;
   try {
-    const r = await fetch(env.DATA_URL + "?t=" + Math.floor(now / 60000),
-      { cf: { cacheTtl: 30 }, headers: { "cache-control": "no-cache" } });
+    const r = await fetch(env.DATA_URL + "?t=" + now,
+      { cf: { cacheTtl: 0 }, headers: { "cache-control": "no-cache" } });
     if (!r.ok) return _cache.data;
     const blob = (await r.text()).trim();
     const snap = JSON.parse(await decrypt(blob, env.DATA_KEY));
