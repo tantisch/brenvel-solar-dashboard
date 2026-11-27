@@ -11,8 +11,11 @@ kv_namespaces = [
 ]
 
 [vars]
-# Encrypted live status file, published to the bot-state branch by GitHub Actions.
+# Encrypted live files published to the bot-state branch by GitHub Actions:
+#   status.enc = compact snapshot (for the bot /status)
+#   data.enc   = full bundle with history (for the live dashboard page)
 DATA_URL = "https://raw.githubusercontent.com/tantisch/brenvel-solar-dashboard/bot-state/status.enc"
+FULL_DATA_URL = "https://raw.githubusercontent.com/tantisch/brenvel-solar-dashboard/bot-state/data.enc"
 # Always-allowed chat ids (owner), comma-separated — works even if KV is empty.
 OWNER_CHATS = "1081188172"
 

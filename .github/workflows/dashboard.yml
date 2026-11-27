@@ -106,8 +106,12 @@ jobs:
                 python notify.py snapshot "$TMP/status.json" \
                   && DATA_PASSWORD="$STATICRYPT_PASSWORD" python cryptoutil.py enc "$TMP/status.json" > "$TMP/status.enc" \
                   || echo "status snapshot/encrypt failed"
+                # Full encrypted bundle for the live Cloudflare dashboard page.
+                DATA_PASSWORD="$STATICRYPT_PASSWORD" python cryptoutil.py enc output/data.json > "$TMP/data.enc" \
+                  || echo "data.enc encrypt failed"
                 sd="$TMP/botstate"; rm -rf "$sd"; mkdir -p "$sd"; cp "$ST" "$sd/bot_state.json"
                 [ -s "$TMP/status.enc" ] && cp "$TMP/status.enc" "$sd/status.enc"
+                [ -s "$TMP/data.enc" ] && cp "$TMP/data.enc" "$sd/data.enc"
                 ( cd "$sd" && git init -q && git checkout -q -b bot-state && git add -A \
                   && git -c user.email=actions@github.com -c user.name="solar-bot" \
                        commit -q -m "state $(date -u +%FT%TZ)" \

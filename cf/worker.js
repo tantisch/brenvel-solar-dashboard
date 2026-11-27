@@ -32,6 +32,7 @@ let _cache = { at: 0, data: null };
 export default {
   async fetch(request, env) {
     const u = new URL(request.url);
+    if (u.pathname === "/data") return dataEndpoint(request, env);
     if (request.method === "GET") {
       if (u.pathname === "/selftest") {
         const snap = await getSnapshot(env);
@@ -110,6 +111,32 @@ async function getSnapshot(env) {
   } catch (e) {
     console.log("getSnapshot error:", e);
     return _cache.data;
+  }
+}
+
+// ---- live dashboard data API (for the Cloudflare Pages page) --------------
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-headers": "x-pw",
+  "access-control-allow-methods": "GET, OPTIONS",
+};
+
+async function dataEndpoint(request, env) {
+  if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
+  const u = new URL(request.url);
+  const pw = request.headers.get("x-pw") || u.searchParams.get("pw") || "";
+  if (pw !== env.DATA_KEY) {
+    return new Response("unauthorized", { status: 401, headers: CORS });
+  }
+  try {
+    const r = await fetch(env.FULL_DATA_URL + "?t=" + Date.now(),
+      { cf: { cacheTtl: 0 }, headers: { "cache-control": "no-cache" } });
+    if (!r.ok) return new Response("data unavailable", { status: 502, headers: CORS });
+    const json = await decrypt((await r.text()).trim(), env.DATA_KEY);
+    return new Response(json, { headers: { ...CORS, "content-type": "application/json; charset=utf-8" } });
+  } catch (e) {
+    console.log("dataEndpoint error:", e);
+    return new Response("error", { status: 500, headers: CORS });
   }
 }
 
