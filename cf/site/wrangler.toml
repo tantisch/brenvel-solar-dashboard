@@ -1,9 +1,0 @@
-# Live dashboard page (static assets only — no data inside).
-# The page asks for the team password and loads data from the bot Worker's
-# /data endpoint (brenvel-solar-bot), refreshing every 5 minutes.
-# Deploy:  cd cf/site && npx wrangler deploy
-name = "brenvel-solar"
-compatibility_date = "2026-11-01"
-
-[assets]
-directory = "../pages"

@@ -749,7 +749,7 @@ function markFresh(){
 }
 
 /* ---------- live data: password-gated Worker endpoint ---------- */
-const API='https://brenvel-solar-bot.sonnen-shop.workers.dev/data';
+const API='/data';   // Pages Function in this same project (functions/data.js)
 const PWKEY='brenvel_pw';
 let PW=null,lastFetch=0,liveT=null;
 const store=(o,k,v)=>{try{if(v===undefined)return o.getItem(k);if(v==null)o.removeItem(k);else o.setItem(k,v);}catch(e){return null;}};
