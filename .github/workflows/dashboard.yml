@@ -106,8 +106,10 @@ jobs:
                 python notify.py snapshot "$TMP/status.json" \
                   && DATA_PASSWORD="$STATICRYPT_PASSWORD" python cryptoutil.py enc "$TMP/status.json" > "$TMP/status.enc" \
                   || echo "status snapshot/encrypt failed"
-                # Full encrypted bundle for the live Cloudflare dashboard page.
-                DATA_PASSWORD="$STATICRYPT_PASSWORD" python cryptoutil.py enc output/data.json > "$TMP/data.enc" \
+                # Full encrypted bundle (tariffs + display names applied) for the
+                # live Cloudflare dashboard page; falls back to the raw dataset.
+                B=output/bundle.json; [ -s "$B" ] || B=output/data.json
+                DATA_PASSWORD="$STATICRYPT_PASSWORD" python cryptoutil.py enc "$B" > "$TMP/data.enc" \
                   || echo "data.enc encrypt failed"
                 sd="$TMP/botstate"; rm -rf "$sd"; mkdir -p "$sd"; cp "$ST" "$sd/bot_state.json"
                 [ -s "$TMP/status.enc" ] && cp "$TMP/status.enc" "$sd/status.enc"

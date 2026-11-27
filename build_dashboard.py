@@ -77,6 +77,10 @@ def main():
     html = template.replace("__DATA__", payload)
 
     os.makedirs(os.path.join(HERE, "output"), exist_ok=True)
+    # Same price-applied bundle as JSON, for the live Cloudflare dashboard
+    # (CI encrypts it into data.enc; the Worker serves it to the page).
+    with open(os.path.join(HERE, "output", "bundle.json"), "w", encoding="utf-8") as fh:
+        json.dump(bundle, fh, ensure_ascii=False)
     out = os.path.join(HERE, "output", "dashboard.html")
     with open(out, "w", encoding="utf-8") as fh:
         fh.write(html)

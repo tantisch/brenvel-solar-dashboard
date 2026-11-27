@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Сонячний парк Brenvel</title>
+<meta name="robots" content="noindex,nofollow">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{
+    /* the original Brenvel look: slate on cool grey, green for energy & money */
+    --bg:#eef2f6; --card:#fff; --sunk:#f8fafc;
+    --line:#e7edf3; --line2:#dbe3ec;
+    --ink:#0f172a; --ink2:#334155; --muted:#64748b; --faint:#94a3b8;
+    --sun:#16a34a; --logo:#f59e0b; --money:#15803d;
+    --ok:#16a34a; --warn:#f59e0b; --off:#94a3b8; --bad:#dc2626;
+    --ok-t:#15803d; --warn-t:#b45309; --off-t:#64748b;
+    --r:16px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .num{font-variant-numeric:tabular-nums}
+  u{text-decoration:none}
+  a{color:inherit;text-decoration:none}
+  button{font:inherit}
+  :focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:6px}
+
+  /* header */
+  header{position:sticky;top:0;z-index:40;background:rgba(238,242,246,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .bar{max-width:1480px;margin:0 auto;padding:12px 28px 6px;display:flex;align-items:center;gap:14px}
+  .brand{display:flex;align-items:center;gap:9px;white-space:nowrap;cursor:pointer;font-size:18px;font-weight:800;letter-spacing:-.3px}
+  .brand svg{color:var(--logo);flex:none}
+  .spacer{flex:1}
+  .live{display:inline-flex;align-items:center;gap:7px;background:#dcfce7;color:#15803d;font-weight:700;font-size:12px;padding:5px 11px;border-radius:999px;white-space:nowrap}
+  .live i{width:7px;height:7px;border-radius:50%;background:#22c55e}
+  .live.stale{background:#fef3c7;color:#92400e}
+  .live.stale i{background:var(--warn)}
+  .fx{font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap;background:#fff;border:1px solid var(--line);border-radius:9px;padding:5px 10px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+  .seg button{border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:800;padding:5px 11px;cursor:pointer}
+  .seg button.on{background:var(--ink);color:#fff}
+  .tabs{max-width:1480px;margin:0 auto;padding:4px 24px 10px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{border:0;background:transparent;color:var(--muted);font-size:14px;font-weight:600;padding:7px 12px;border-radius:9px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
+  .tab:hover{background:#e2e8f0;color:var(--ink)}
+  .tab.on{background:var(--ink);color:#fff}
+  .tab i{width:7px;height:7px;border-radius:50%}
+
+  .wrap{max-width:1480px;margin:0 auto;padding:22px 28px 56px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r)}
+  .mt{margin-top:16px}
+  .pn{padding:20px}
+
+  /* attention */
+  .attn{display:flex;align-items:center;gap:10px 12px;flex-wrap:wrap;background:#fffbeb;border:1px solid #fde68a;border-radius:13px;padding:11px 16px;margin-bottom:18px;font-size:14px;color:#92400e}
+  .attn svg{color:#d97706;flex:none}
+  .attn b{font-weight:700}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{border:1px solid #fde68a;background:#fff;color:#92400e;border-radius:999px;padding:3px 11px;font-size:13px;font-weight:600;cursor:pointer}
+  .chip:hover{border-color:#f59e0b;background:#fffdf5}
+
+  /* hero */
+  .hero{display:grid;grid-template-columns:minmax(280px,.7fr) 1.9fr}
+  .hero .lead{padding:22px 24px;border-right:1px solid var(--line);display:flex;flex-direction:column}
+  .lab{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .big{font-size:56px;font-weight:800;line-height:1;letter-spacing:-2px;margin-top:10px;white-space:nowrap}
+  .big u{font-size:18px;color:var(--sun);font-weight:700;letter-spacing:0;margin-left:6px}
+  .lead .n2{color:var(--muted);font-size:13.5px;margin-top:10px}
+  .lead .n2 b{color:var(--ink);font-weight:700}
+  .mini2{display:grid;gap:9px;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+  .mini2 div{display:flex;justify-content:space-between;gap:12px;font-size:13.5px}
+  .mini2 .k{color:var(--muted)}
+  .mini2 .v{font-weight:700}
+  .gauge{margin-top:auto;padding-top:20px}
+  .gauge .tr{height:7px;border-radius:4px;background:#e8edf3;overflow:hidden}
+  .gauge .tr i{display:block;height:100%;background:var(--sun);border-radius:4px}
+  .gauge .lg{display:flex;justify-content:space-between;color:var(--muted);font-size:12.5px;margin-top:7px}
+  .gauge .lg b{color:var(--ink);font-weight:700}
+  .hero .curve{padding:18px 20px 14px}
+  .chead{display:flex;align-items:baseline;gap:10px;margin:0 0 12px;flex-wrap:wrap}
+  .chead h3{margin:0;font-size:15px;font-weight:700}
+  .chead .s{color:var(--faint);font-size:12.5px}
+  .ch{position:relative;height:230px}
+  .ch.tall{height:300px}
+  .ch.md{height:270px}
+  .ch.sm{height:230px}
+  .money{color:var(--money)!important}
+
+  /* KPI cards (separate tiles, as on the original dashboard) */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+  .kpis.c5{grid-template-columns:repeat(5,1fr)}
+  .kpis.c4{grid-template-columns:repeat(4,1fr)}
+  .kpis.c3{grid-template-columns:repeat(3,1fr)}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:16px 18px;min-width:0}
+  .kpi.accent{background:#f0fdf4;border-color:#bbf7d0}
+  .kpi .k{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .kpi .v{font-size:24px;font-weight:800;margin-top:7px;letter-spacing:-.6px;line-height:1.1;white-space:nowrap}
+  .kpi .v u{font-size:13px;color:var(--faint);font-weight:700;margin-left:4px;letter-spacing:0}
+  .kpi .s{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .kpi .s b{color:var(--money);font-weight:800}
+  .sh.tight{margin:22px 2px 12px}
+
+  /* section heads */
+  .sh{display:flex;align-items:baseline;gap:10px;margin:32px 2px 14px;flex-wrap:wrap}
+  .sh h2{margin:0;font-size:16px;font-weight:800;letter-spacing:-.2px;color:var(--ink2)}
+  .sh .c{color:var(--faint);font-size:12.5px}
+  .sh .r{margin-left:auto;display:flex;gap:14px;color:var(--muted);font-size:12.5px;align-items:center}
+  .lgd{display:inline-flex;align-items:center;gap:6px}
+  .lgd i{width:8px;height:8px;border-radius:50%}
+
+  /* station cards */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(372px,1fr));gap:16px}
+  .sc{padding:16px 18px 14px;cursor:pointer;border-top:4px solid var(--off);transition:transform .12s,box-shadow .12s}
+  .sc:hover{transform:translateY(-2px);box-shadow:0 12px 28px -14px rgba(15,23,42,.28)}
+  .sc-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .sc-h .nm{font-weight:700;font-size:15.5px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sc-h .nm span{color:var(--muted);font-weight:600}
+  .badge{font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;color:#fff;white-space:nowrap;flex:none}
+  .sc-m{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:10px}
+  .pw b{font-size:28px;font-weight:800;letter-spacing:-.8px;line-height:1}
+  .pw u{font-size:13px;color:var(--faint);font-weight:700;margin-left:4px}
+  .ld{font-size:12.5px;color:var(--muted);white-space:nowrap}
+  .ld b{color:var(--ink);font-weight:700}
+  .spark{margin-top:12px}
+  .spark svg{display:block;width:100%;height:96px}
+  .sp-plot{position:relative}
+  .sp-x,.sp-dot,.sp-tip{position:absolute;pointer-events:none;display:none}
+  .sp-plot.on .sp-x,.sp-plot.on .sp-dot,.sp-plot.on .sp-tip{display:block}
+  .sp-x{top:0;bottom:0;width:1px;margin-left:-.5px;background:rgba(15,23,42,.28)}
+  .sp-dot{width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:#fff;border:2px solid var(--sun)}
+  .sp-tip{z-index:3;background:#0f172a;color:#fff;border-radius:7px;padding:6px 9px;font-size:12px;line-height:1.3;white-space:nowrap;box-shadow:0 6px 16px -6px rgba(15,23,42,.45)}
+  .sp-tip .t{color:#cbd5e1;font-size:11px}
+  .sp-tip b{font-weight:700}
+  .axis{display:flex;justify-content:space-between;color:var(--faint);font-size:10.5px;font-weight:600;margin-top:4px}
+  .nodata{height:96px;display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:12.5px;font-weight:600;background:var(--sunk);border-radius:10px}
+  .sc-f{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .sc-f .k{color:var(--faint);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+  .sc-f .v{font-size:14px;font-weight:700;margin-top:2px;white-space:nowrap}
+  .sc-f .v u{font-size:11.5px;color:var(--faint);font-weight:700;margin-left:3px}
+  .sc-f>div:nth-child(2){text-align:center}
+  .sc-f>div:last-child{text-align:right}
+
+  /* ranking + share */
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+  .rank{display:grid;gap:10px;margin-top:4px}
+  .rk{display:grid;grid-template-columns:130px 1fr 60px;align-items:center;gap:12px;font-size:13.5px;cursor:pointer}
+  .rk .n{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rk:hover .n{text-decoration:underline}
+  .rk .t{height:9px;background:#eef2f6;border-radius:5px;position:relative}
+  .rk .t i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--sun)}
+  .rk .v{text-align:right;font-weight:700}
+  .share{display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;margin-top:6px}
+  .share i{display:block;height:100%}
+  .slist{display:grid;gap:9px;margin-top:16px}
+  .sl{display:grid;grid-template-columns:10px 1fr auto 46px;align-items:center;gap:10px;font-size:13.5px;cursor:pointer}
+  .sl:hover .n{text-decoration:underline}
+  .sl .sw{width:10px;height:10px;border-radius:3px}
+  .sl .n{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sl .e{font-weight:700}
+  .sl .p{color:var(--muted);text-align:right;font-weight:600}
+  .empty{color:var(--faint);font-size:13px;padding:18px 0}
+
+  /* range */
+  .range{display:flex;align-items:center;gap:7px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin:0 0 14px}
+  .rb{border:1px solid var(--line);background:#fff;color:var(--muted);font-size:13px;font-weight:600;padding:7px 13px;border-radius:9px;cursor:pointer}
+  .rb:hover{background:#f1f5f9;color:var(--ink)}
+  .rb.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .range .sep{width:1px;height:24px;background:var(--line);margin:0 4px}
+  .range .or{font-size:12px;color:var(--faint);font-weight:600}
+  .range input[type=date]{border:1px solid var(--line);border-radius:9px;padding:6px 9px;font:inherit;font-size:13px;color:var(--ink);background:#fff}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);font-size:13px;font-weight:700;padding:7px 13px;border-radius:9px;cursor:pointer}
+  .btn:hover{background:#f1f5f9}
+  .btn.pri{background:var(--ink);border-color:var(--ink);color:#fff}
+  .sum{display:flex;gap:34px;flex-wrap:wrap;margin:0 0 16px}
+  .sum .k{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .sum .v{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-top:4px}
+
+  /* station view */
+  .back{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:13.5px;font-weight:600;border:0;background:none;cursor:pointer;padding:0;margin-bottom:12px}
+  .back:hover{color:var(--ink)}
+  .sthead{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:18px}
+  .sthead h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.6px;display:flex;align-items:center;gap:12px}
+  .sthead .meta{color:var(--muted);font-size:13.5px;margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .sthead .meta b{color:var(--ink);font-weight:700}
+  .sthead .meta span{display:inline-flex;align-items:center;gap:6px}
+  .tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .tag{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;color:var(--muted)}
+  a.tag:hover{color:var(--ink);border-color:var(--line2)}
+  .sthead .badge{font-size:12px;padding:5px 12px}
+  .tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-left:auto}
+  .tog input{accent-color:var(--ink);width:15px;height:15px;margin:0}
+  .cgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:16px}
+  .cgrid .full{grid-column:1/-1}
+  .infonote{display:flex;gap:10px;align-items:flex-start;background:#f1f5f9;border:1px solid var(--line);border-radius:12px;padding:11px 16px;color:var(--muted);font-size:13px;margin:14px 0 0;line-height:1.55}
+  .infonote svg{flex:none;margin-top:1px}
+  .alarms{padding:4px 20px}
+  .al{display:flex;gap:10px;align-items:flex-start;padding:13px 0;border-top:1px solid var(--line);font-size:14px}
+  .al:first-child{border-top:0}
+  .al svg{color:#d97706;flex:none;margin-top:1px}
+  .al .dv{color:var(--muted);font-size:13px}
+  .okrow{color:var(--ok-t);font-weight:700;padding:14px 0;display:flex;align-items:center;gap:8px;font-size:14px}
+
+  /* tariffs */
+  details.prices{margin-top:30px}
+  details.prices>summary{list-style:none;cursor:pointer;padding:15px 20px;display:flex;align-items:baseline;gap:10px;font-weight:700;font-size:14.5px;color:var(--ink2);border-radius:var(--r)}
+  details.prices>summary:hover{background:#f8fafc}
+  details.prices>summary::-webkit-details-marker{display:none}
+  details.prices>summary .s{color:var(--faint);font-weight:500;font-size:12.5px}
+  details.prices>summary .chev{margin-left:auto;color:var(--faint);transition:transform .15s;align-self:center}
+  details.prices[open]>summary .chev{transform:rotate(180deg)}
+  .pbody{padding:6px 20px 20px;border-top:1px solid var(--line)}
+  .prow{display:flex;align-items:center;gap:10px;margin:14px 0 4px;font-size:13px;font-weight:600;color:var(--muted)}
+  .ptbl{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px}
+  .ptbl th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--faint);font-weight:700;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .ptbl td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+  .ptbl .id{color:var(--muted);font-size:12.5px;white-space:normal}
+  .ptbl input,.prow input{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px;width:96px;color:var(--ink)}
+  .ptbl input[type=text]{width:170px}
+  .pacts{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .phint{color:var(--muted);font-size:12.5px;line-height:1.6;margin-top:12px;max-width:860px}
+
+  .foot{color:var(--faint);font-size:12px;margin-top:36px;text-align:center}
+  .foot a{color:var(--muted);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+  .loading{padding:90px 16px;text-align:center;color:var(--muted);font-weight:600;font-size:14px}
+  .loading .btn{margin-left:8px}
+
+  /* password screen */
+  .gate{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px}
+  .gate[hidden]{display:none}
+  .gcard{width:100%;max-width:380px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:28px 26px;box-shadow:0 20px 40px -24px rgba(15,23,42,.25)}
+  .gbrand{display:flex;align-items:center;gap:9px;font-size:19px;font-weight:800;letter-spacing:-.3px}
+  .gbrand svg{color:var(--logo);flex:none}
+  .gcard p{color:var(--muted);font-size:14px;margin:10px 0 18px;line-height:1.5}
+  .gcard input[type=password]{width:100%;border:1px solid var(--line2);border-radius:10px;padding:11px 12px;font:inherit;font-size:15px;color:var(--ink)}
+  .gchk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);font-weight:600;margin:12px 0 16px;cursor:pointer}
+  .gchk input{accent-color:var(--ink);width:15px;height:15px;margin:0}
+  .gcard .btn{width:100%;padding:11px;font-size:14.5px}
+  .gcard .btn:disabled{opacity:.6;cursor:default}
+  .gerr{color:var(--bad);font-size:13px;font-weight:600;margin-top:10px;min-height:1.2em}
+
+  @media(max-width:1180px){
+    .kpis.c5{grid-template-columns:repeat(3,1fr)}
+    .kpis.c4{grid-template-columns:repeat(2,1fr)}
+    .duo{grid-template-columns:1fr}
+  }
+  @media(max-width:820px){
+    .bar{padding:12px 14px 4px;gap:10px;flex-wrap:wrap}
+    .tabs{padding:4px 10px 10px}
+    .wrap{padding:16px 14px 44px}
+    .hero{grid-template-columns:1fr}
+    .hero .lead{border-right:0;border-bottom:1px solid var(--line)}
+    .big{font-size:46px}
+    .grid,.cgrid{grid-template-columns:1fr}
+    .kpis,.kpis.c5,.kpis.c4,.kpis.c3{grid-template-columns:repeat(2,1fr);gap:10px}
+    .kpi{padding:13px;border-radius:13px}
+    .kpi .v{font-size:20px}
+    .kpi .k{font-size:10px}
+    .fx{display:none}
+    .rk{grid-template-columns:100px 1fr 50px}
+    .ptbl .id{display:none}
+    .range{padding:9px 10px;gap:6px}
+    .rb{padding:6px 11px;font-size:12.5px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="brand" onclick="go(-1)" title="Огляд">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4"/>
+        <path d="M12 2.8V5M12 19v2.2M2.8 12H5M19 12h2.2M5.5 5.5 7 7M17 17l1.5 1.5M5.5 18.5 7 17M17 7l1.5-1.5"/>
+      </svg>
+      Сонячний парк Brenvel
+    </a>
+    <div class="spacer"></div>
+    <div class="seg" id="curtog">
+      <button data-c="€" class="on" onclick="setCur('€')">€</button>
+      <button data-c="₴" onclick="setCur('₴')">₴</button>
+    </div>
+    <span class="fx num" id="fxnote" title="Курс, за яким дохід рахується в гривні"></span>
+    <span class="live" id="upd"></span>
+  </div>
+  <nav class="tabs" id="nav" aria-label="Станції"></nav>
+</header>
+
+<div class="gate" id="gate" hidden>
+  <form class="gcard" onsubmit="login(event)">
+    <div class="gbrand"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.8V5M12 19v2.2M2.8 12H5M19 12h2.2M5.5 5.5 7 7M17 17l1.5 1.5M5.5 18.5 7 17M17 7l1.5-1.5"/></svg>Сонячний парк Brenvel</div>
+    <p>Введіть пароль команди, щоб переглянути панель сонячних станцій.</p>
+    <input id="gpw" type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль" required>
+    <label class="gchk"><input id="grem" type="checkbox" checked>Запам'ятати на цьому пристрої</label>
+    <button class="btn pri" id="gbtn" type="submit">Переглянути панель</button>
+    <div class="gerr" id="gerr" role="alert"></div>
+  </form>
+</div>
+
+<main class="wrap">
+  <div id="view"><div class="loading">Завантаження даних…</div></div>
+  <footer class="foot" id="foot"></footer>
+</main>
+
+<script>
+/* ---------- constants ---------- */
+const GRID=[];for(let h=0;h<24;h++)for(let m=0;m<60;m+=5)GRID.push(String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'));
+const MON=['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'];
+const ST={connected:['var(--ok)','Онлайн','#16a34a',0,'var(--ok-t)'],trouble:['var(--warn)','Попередження','#f59e0b',1,'var(--warn-t)'],
+          disconnected:['var(--off)','Офлайн','#94a3b8',2,'var(--off-t)'],unknown:['var(--off)','Невідомо','#94a3b8',2,'var(--off-t)']};
+/* station colours: no red/grey (those mean fault/offline); biggest plants get the most distinct hues */
+const COLORS=['#2563eb','#8b5cf6','#16a34a','#f59e0b','#0891b2','#db2777','#ea580c','#0d9488','#a16207'];let SC=[];
+const C={pv:'#16a34a',load:'#475569',selfuse:'#16a34a',export:'#f59e0b',imp:'#dc2626',rev:'#0284c7'};
+const sv=(p,w=16)=>`<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const ICON={
+  warn:sv('<path d="M12 3.6 2.9 19.4h18.2L12 3.6Z"/><path d="M12 10v4.2M12 16.9h.01"/>'),
+  pin:sv('<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/>',14),
+  map:sv('<path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Z"/><path d="M9 4v14M15 6v14"/>',14),
+  info:sv('<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>'),
+  check:sv('<path d="m5 12.5 4.2 4.2L19 7"/>'),
+  left:sv('<path d="m14.5 6-6 6 6 6"/>',15),
+  down:sv('<path d="m6 9.5 6 6 6-6"/>',16)
+};
+
+/* ---------- state ---------- */
+let DATA,S,TODAY,NOWI=null,FX=42,REPO='tantisch/brenvel-solar-dashboard';
+let CUR='€',RANGE={key:'30d'},curView=-1,charts=[],PRICES_OPEN=false;
+
+/* ---------- helpers ---------- */
+const esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const nf=(n,d=0)=>(n==null||isNaN(n))?'—':Number(n).toLocaleString('uk-UA',{minimumFractionDigits:d,maximumFractionDigits:d});
+const kw=n=>nf(n,Math.abs(n)<10?1:0);
+const short=n=>String(n).replace('Brenvel_','').replace('Brenvei_','');
+const nm=s=>s.display||s.name;
+const stv=s=>ST[s.status]||ST.unknown;
+const cap=s=>s.nominal_kw>0?nf(s.nominal_kw)+' кВт':'—';
+const noHist=s=>!(s.daily&&s.daily.length);
+const hasRev=s=>(s.daily||[]).some(d=>d.rev!=null);
+const pvToday=s=>(s.today&&s.today.pv!=null)?s.today.pv:(s.today_kwh||0);
+const tRev=s=>s.today_rev!=null?s.today_rev:((s.daily||[]).find(d=>d.label===TODAY)||{}).rev||0;
+function eS(k){k=k||0;if(k>=1e6)return{v:nf(k/1e6,2),u:'ГВт·год'};if(k>=1e3)return{v:nf(k/1e3,1),u:'МВт·год'};return{v:nf(k),u:'кВт·год'};}
+const eTxt=k=>{const e=eS(k);return e.v+' '+e.u;};
+const eHtml=k=>{const e=eS(k);return e.v+'<u>'+e.u+'</u>';};
+function incomeOf(s,pv,eurRev){pv=pv||0;const p=(s&&s.pr)||{};
+  const eur=(p.custom&&p.eur>0)?pv*p.eur/1000:(eurRev||0);return CUR==='₴'?eur*FX:eur;}
+function money(v){v=v||0;const a=Math.abs(v);const n=a>=1e6?nf(v/1e6,2)+' млн':nf(v,a<100?2:0);return CUR==='€'?'€'+n:n+' ₴';}
+function slotOf(t){const a=String(t||'').match(/(\d{1,2}):(\d{2})(?!.*\d{1,2}:\d{2})/);if(!a)return -1;return (+a[1])*12+Math.floor((+a[2])/5);}
+function toGrid(curve,key){const g=new Array(288).fill(null);(curve||[]).forEach(p=>{const v=p[key];if(v==null)return;const i=slotOf(p.t);if(i>=0&&i<288)g[i]=v;});return g;}
+function peakOf(g){let pk=0,i=-1;g.forEach((v,k)=>{if(v!=null&&v>pk){pk=v;i=k;}});return {pk,i};}
+function hexA(h,a){const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;}
+
+/* ---------- date range ---------- */
+const isoAgo=n=>{const d=new Date(TODAY);d.setDate(d.getDate()-n);return d.toISOString().slice(0,10);};
+const monAgo=n=>{const d=new Date(TODAY);d.setMonth(d.getMonth()-n);return d.toISOString().slice(0,7);};
+const RPRESETS=[['today','Сьогодні'],['7d','7 днів'],['30d','30 днів'],['month','Цей місяць'],['90d','90 днів'],['year','Цей рік'],['12m','12 місяців'],['all','Весь час']];
+function resolveRange(){
+  const k=RANGE.key,end=TODAY;
+  if(k==='today') return {gran:'daily',from:end,to:end,title:'сьогодні'};
+  if(k==='7d')    return {gran:'daily',from:isoAgo(6),to:end,title:'останні 7 днів'};
+  if(k==='30d')   return {gran:'daily',from:isoAgo(29),to:end,title:'останні 30 днів'};
+  if(k==='90d')   return {gran:'daily',from:isoAgo(89),to:end,title:'останні 90 днів'};
+  if(k==='month') return {gran:'daily',from:TODAY.slice(0,7)+'-01',to:end,title:'цей місяць'};
+  if(k==='year')  return {gran:'monthly',from:TODAY.slice(0,4)+'-01',to:TODAY.slice(0,7),title:'цей рік'};
+  if(k==='12m')   return {gran:'monthly',from:monAgo(11),to:TODAY.slice(0,7),title:'останні 12 місяців'};
+  if(k==='all')   return {gran:'yearly',title:'весь час'};
+  if(k==='custom'){const sp=(new Date(RANGE.to)-new Date(RANGE.from))/864e5;
+    return {gran:sp<=400?'daily':'monthly',from:RANGE.from,to:(sp<=400?RANGE.to:RANGE.to.slice(0,7)),title:RANGE.from+' – '+RANGE.to};}
+}
+function setRange(k){RANGE={key:k};rerender();}
+function applyCustom(){const f=document.getElementById('rfrom').value,t=document.getElementById('rto').value;if(f&&t){RANGE={key:'custom',from:f,to:t};rerender();}}
+function rangeBar(){
+  return `<div class="range">${RPRESETS.map(([k,l])=>`<button class="rb ${RANGE.key===k?'on':''}" onclick="setRange('${k}')">${l}</button>`).join('')}
+    <span class="sep"></span><span class="or">або</span>
+    <input type="date" id="rfrom" max="${TODAY}" value="${RANGE.from||isoAgo(29)}" aria-label="Від">
+    <span class="or">–</span>
+    <input type="date" id="rto" max="${TODAY}" value="${RANGE.to||TODAY}" aria-label="До">
+    <button class="rb ${RANGE.key==='custom'?'on':''}" onclick="applyCustom()">Застосувати</button></div>`;
+}
+const pick=(rec,g)=>g==='monthly'?rec.monthly:g==='yearly'?rec.yearly:rec.daily;
+function agg(rec,R){
+  let data=(pick(rec,R.gran)||[]).slice();
+  if(R.from)data=data.filter(r=>r.label>=R.from&&r.label<=R.to);
+  const tot={pv:0,load:0,selfuse:0,export:0,imp:0,rev:0},has={};
+  data.forEach(r=>{for(const k in tot)if(r[k]!=null){tot[k]+=r[k];has[k]=1;}});
+  for(const k in tot)if(!has[k])tot[k]=null;
+  return {data,tot};
+}
+function lbl(s,g){if(g==='daily')return s.slice(8,10)+'.'+s.slice(5,7);if(g==='monthly')return MON[+s.slice(5,7)-1]+' '+s.slice(2,4);return s;}
+const unitWord=g=>g==='daily'?'день':g==='monthly'?'місяць':'рік';
+
+/* ---------- charts ---------- */
+Chart.defaults.font.family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+Chart.defaults.font.size=11.5;
+Chart.defaults.color='#64748b';
+Chart.defaults.borderColor='#e8edf3';
+Object.assign(Chart.defaults.plugins.tooltip,{backgroundColor:'#0f172a',titleColor:'#cbd5e1',bodyColor:'#fff',padding:10,cornerRadius:8,boxPadding:4,titleFont:{weight:'600'},bodyFont:{weight:'700'}});
+Chart.register({id:'nowLine',afterDatasetsDraw(c,a,o){if(!o||o.idx==null)return;const x=c.scales.x.getPixelForValue(o.idx),{top,bottom}=c.chartArea,g=c.ctx;
+  g.save();g.strokeStyle='rgba(15,23,42,.32)';g.lineWidth=1;g.setLineDash([3,3]);g.beginPath();g.moveTo(x,top);g.lineTo(x,bottom);g.stroke();
+  g.setLineDash([]);g.fillStyle='#64748b';g.font="600 10.5px -apple-system,BlinkMacSystemFont,sans-serif";g.textAlign='center';g.fillText('зараз',x,top-4);g.restore();}});
+const clearCharts=()=>{charts.forEach(c=>c.destroy());charts=[];};
+function mk(id,cfg){const el=document.getElementById(id);if(!el)return null;const c=new Chart(el,cfg);charts.push(c);return c;}
+const axY=fmtv=>({beginAtZero:true,border:{display:false},grid:{color:'#eef2f6'},ticks:{maxTicksLimit:5,callback:fmtv||(v=>v>=1000?nf(v/1000,v%1000?1:0)+'к':nf(v))}});
+const axX={grid:{display:false},border:{color:'#e2e8f0'},ticks:{maxRotation:0,autoSkipPadding:14}};
+const axDay={grid:{display:false},border:{color:'#e2e8f0'},ticks:{maxRotation:0,autoSkip:false,callback:function(v,i){return i%36===0?this.getLabelForValue(v):'';}}};
+const legend={position:'bottom',align:'start',labels:{boxWidth:8,boxHeight:8,usePointStyle:true,pointStyle:'rectRounded',padding:16}};
+const fillGrad=col=>ctx=>{const {chart}=ctx,{ctx:g,chartArea}=chart;if(!chartArea)return 'transparent';
+  const gr=g.createLinearGradient(0,chartArea.top,0,chartArea.bottom);gr.addColorStop(0,hexA(col,.2));gr.addColorStop(1,hexA(col,0));return gr;};
+function bars(id,labels,sets,unit,stacked){
+  return mk(id,{type:'bar',data:{labels,datasets:sets.map(d=>({label:d.l,data:d.d,backgroundColor:d.c,borderRadius:stacked?1.5:3,maxBarThickness:30,stack:stacked?'s':undefined}))},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{intersect:false,mode:'index'},
+      plugins:{legend:{...legend,display:sets.length>1},
+        tooltip:{callbacks:{label:c=>' '+c.dataset.label+': '+(unit==='money'?money(c.parsed.y):nf(c.parsed.y)+' '+unit)}}},
+      scales:{x:{...axX,stacked:!!stacked},y:{...axY(unit==='money'?(v=>money(v)):null),stacked:!!stacked}}}});
+}
+function line24(id,sets){
+  return mk(id,{type:'line',data:{labels:GRID,datasets:sets.map((s,k)=>({label:s.l,data:s.d,borderColor:s.c,
+      backgroundColor:k===0?fillGrad(s.c):'transparent',fill:k===0,borderWidth:k===0?2:1.6,borderDash:s.dash||[],
+      tension:.35,pointRadius:0,pointHoverRadius:3,spanGaps:false}))},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{intersect:false,mode:'index'},layout:{padding:{top:14}},
+      plugins:{legend:{...legend,display:sets.length>1,labels:{...legend.labels,generateLabels:c=>Chart.defaults.plugins.legend.labels.generateLabels(c).map(l=>({...l,fillStyle:l.strokeStyle,lineWidth:0}))}},nowLine:{idx:NOWI},
+        tooltip:{filter:c=>c.parsed.y!=null,callbacks:{label:c=>' '+(sets.length>1?c.dataset.label+': ':'')+nf(c.parsed.y,1)+' кВт'}}},
+      scales:{x:axDay,y:axY(v=>nf(v)+' кВт')}}});
+}
+function donut(id,labels,data,cols,unit){
+  return mk(id,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:cols,borderWidth:2,borderColor:'#fff',hoverOffset:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'68%',
+      plugins:{legend:{position:'right',labels:{boxWidth:8,boxHeight:8,usePointStyle:true,pointStyle:'rectRounded',padding:14}},
+        tooltip:{callbacks:{label:c=>{const t=c.dataset.data.reduce((a,b)=>a+b,0);return ' '+c.label+': '+nf(c.parsed)+' '+unit+' ('+(t?Math.round(c.parsed/t*100):0)+'%)';}}}}}});
+}
+function noData(id,msg){const c=document.getElementById(id);if(c)c.parentElement.innerHTML=`<div class="nodata" style="height:100%">${msg}</div>`;}
+
+/* ---------- card sparkline (24h) ---------- */
+const SPK={};
+function spark(s,si){
+  const g=toGrid(s.today_curve,'kw'),vals=g.filter(v=>v!=null);
+  const ax='<div class="axis num"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>';
+  if(vals.length<2)return `<div class="nodata">немає даних за сьогодні</div>${ax}`;
+  const W=288,H=96,mx=(Math.max(...vals)*1.12)||1,col=stv(s)[2],y=v=>H-1-(v/mx)*(H-6);
+  SPK[si]={g,y,col};
+  const segs=[];let seg=[];g.forEach((v,i)=>{if(v==null){if(seg.length){segs.push(seg);seg=[];}}else seg.push([i+.5,y(v)]);});if(seg.length)segs.push(seg);
+  let d='',area='';
+  segs.forEach(sg=>{const p=sg.map((q,k)=>(k?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');
+    d+=p+' ';area+=p+` L${sg[sg.length-1][0].toFixed(1)} ${H} L${sg[0][0].toFixed(1)} ${H} Z `;});
+  const id='g'+Math.random().toString(36).slice(2,8);
+  const guides=[72,144,216].map(x=>`<line x1="${x}" x2="${x}" y1="0" y2="${H}" stroke="#eef2f6" vector-effect="non-scaling-stroke"/>`).join('');
+  const now=NOWI!=null?`<line x1="${NOWI+.5}" x2="${NOWI+.5}" y1="0" y2="${H}" stroke="#0f172a" stroke-opacity=".28" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>`:'';
+  return `<div class="sp-plot" data-si="${si}"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="${col}" stop-opacity=".22"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    ${guides}<line x1="0" x2="${W}" y1="${H-.5}" y2="${H-.5}" stroke="#e2e8f0" vector-effect="non-scaling-stroke"/>
+    <path d="${area}" fill="url(#${id})"/><path d="${d}" fill="none" stroke="${col}" stroke-width="1.7" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${now}</svg>
+    <i class="sp-x"></i><i class="sp-dot" style="border-color:${col}"></i><div class="sp-tip"></div></div>${ax}`;
+}
+/* hover: time + kW at the pointer (same info as the Chart.js tooltips elsewhere) */
+let spCur=null;
+function spHide(){if(spCur){spCur.classList.remove('on');spCur=null;}}
+function spMove(e){
+  const p=e.target.closest&&e.target.closest('.sp-plot');
+  if(p!==spCur)spHide();if(!p)return;
+  const d=SPK[p.dataset.si];if(!d)return;
+  const r=p.getBoundingClientRect(),n=288;let i=Math.floor((e.clientX-r.left)/r.width*n);i=Math.max(0,Math.min(n-1,i));
+  let k=-1;for(let o=0;o<=3&&k<0;o++){if(d.g[i-o]!=null)k=i-o;else if(d.g[i+o]!=null)k=i+o;}
+  if(k<0){spHide();return;}
+  const x=(k+.5)/n*r.width,yy=d.y(d.g[k]);
+  const lx=p.querySelector('.sp-x'),dot=p.querySelector('.sp-dot'),tip=p.querySelector('.sp-tip');
+  lx.style.left=x+'px';dot.style.left=x+'px';dot.style.top=yy+'px';
+  tip.innerHTML=`<div class="t num">${GRID[k]}</div><b class="num">${nf(d.g[k],1)} кВт</b>`;
+  const right=x>r.width-120;tip.style.left=(right?x-10:x+10)+'px';tip.style.transform=right?'translateX(-100%)':'none';
+  tip.style.top=Math.max(0,Math.min(yy-22,96-44))+'px';
+  p.classList.add('on');spCur=p;
+}
+document.addEventListener('pointermove',spMove);
+document.addEventListener('pointerdown',spMove);
+document.addEventListener('pointerout',e=>{if(spCur&&!(e.relatedTarget&&spCur.contains(e.relatedTarget)))spHide();});
+
+/* ---------- OVERVIEW ---------- */
+function overview(){
+  clearCharts();
+  const R=resolveRange(),TM=TODAY.slice(0,7),TY=TODAY.slice(0,4);
+  const fM=(s,l)=>(s.monthly||[]).find(x=>x.label===l),fY=(s,l)=>(s.yearly||[]).find(x=>x.label===l);
+  const sumY=(s,k)=>(s.yearly||[]).reduce((a,y)=>a+(y[k]||0),0);
+  const T={now:0,cap:0,pvD:0,revD:0,pvM:0,revM:0,pvY:0,revY:0,pvL:0,revL:0};
+  S.forEach(s=>{T.now+=s.now_kw||0;T.cap+=s.nominal_kw||0;
+    const d=pvToday(s);T.pvD+=d;T.revD+=incomeOf(s,d,tRev(s));
+    const m=fM(s,TM)||{};T.pvM+=m.pv||0;T.revM+=incomeOf(s,m.pv||0,m.rev);
+    const y=fY(s,TY)||{};T.pvY+=y.pv||0;T.revY+=incomeOf(s,y.pv||0,y.rev);
+    const l=sumY(s,'pv');T.pvL+=l;T.revL+=incomeOf(s,l,sumY(s,'rev'));});
+  const fleet=new Array(288).fill(null);
+  S.forEach(s=>toGrid(s.today_curve,'kw').forEach((v,i)=>{if(v!=null)fleet[i]=(fleet[i]||0)+v;}));
+  const P=peakOf(fleet),online=S.filter(s=>s.status==='connected').length;
+  const probs=S.map((s,i)=>({s,i})).filter(o=>o.s.status!=='connected');
+  const load=T.cap?T.now/T.cap*100:0;
+  const order=S.map((s,i)=>({s,i})).sort((a,b)=>stv(a.s)[3]-stv(b.s)[3]||(b.s.now_kw||0)-(a.s.now_kw||0));
+
+  // specific yield today
+  const yRows=S.map((s,i)=>({s,i,y:s.nominal_kw>0?pvToday(s)/s.nominal_kw:null})).filter(r=>r.y!=null).sort((a,b)=>b.y-a.y);
+  const yMax=Math.max(...yRows.map(r=>r.y),0)||1;
+  const rankHtml=T.pvD>0?`<div class="rank">${yRows.map(r=>`<div class="rk" onclick="go(${r.i})"><span class="n">${esc(short(nm(r.s)))}</span>
+      <span class="t"><i style="width:${(r.y/yMax*100).toFixed(1)}%"></i></span>
+      <span class="v num">${nf(r.y,2)}</span></div>`).join('')}</div>`
+    :`<div class="empty">Сьогодні ще немає генерації.</div>`;
+  // share today
+  const sRows=S.map((s,i)=>({s,i,e:pvToday(s)})).filter(r=>r.e>0).sort((a,b)=>b.e-a.e);
+  const shareHtml=T.pvD>0?`<div class="share">${sRows.map(r=>`<i style="flex:${r.e};background:${SC[r.i]}" title="${esc(nm(r.s))}"></i>`).join('')}</div>
+      <div class="slist">${sRows.map(r=>`<div class="sl" onclick="go(${r.i})"><span class="sw" style="background:${SC[r.i]}"></span>
+        <span class="n">${esc(short(nm(r.s)))}</span><span class="e num">${eTxt(r.e)}</span><span class="p num">${nf(r.e/T.pvD*100,0)}%</span></div>`).join('')}</div>`
+    :`<div class="empty">Сьогодні ще немає генерації.</div>`;
+
+  // period
+  const per=S.map((s,i)=>({s,i,a:agg(s,R)}));
+  const allL=[...new Set(per.flatMap(p=>p.a.data.map(d=>d.label)))].sort();
+  const pTot=per.reduce((a,p)=>a+(p.a.tot.pv||0),0),pRev=per.reduce((a,p)=>a+incomeOf(p.s,p.a.tot.pv,p.a.tot.rev),0);
+
+  document.getElementById('view').innerHTML=`
+    ${probs.length?`<div class="attn">${ICON.warn}<b>Потребують уваги: ${probs.length}</b>
+      <div class="chips">${probs.map(o=>`<button class="chip" onclick="go(${o.i})">${esc(short(nm(o.s)))} · ${stv(o.s)[1].toLowerCase()}</button>`).join('')}</div></div>`:''}
+
+    <section class="card hero">
+      <div class="lead">
+        <div class="lab">Поточна потужність парку</div>
+        <div class="big num">${kw(T.now)}<u>кВт</u></div>
+        <div class="n2">${P.i>=0?`Пік сьогодні <b class="num">${kw(P.pk)} кВт</b> о <b class="num">${GRID[P.i]}</b>`:'Сьогодні ще немає генерації'}</div>
+        <div class="mini2">
+          <div><span class="k">Генерують зараз</span><span class="v num">${S.filter(s=>(s.now_kw||0)>0.05).length} з ${S.length}</span></div>
+          <div><span class="k">Вироблено сьогодні</span><span class="v num">${eTxt(T.pvD)}</span></div>
+          <div><span class="k">Дохід сьогодні</span><span class="v num money">${money(T.revD)}</span></div>
+        </div>
+        <div class="gauge"><div class="tr"><i style="width:${Math.min(100,load).toFixed(1)}%"></i></div>
+          <div class="lg"><span><b class="num">${nf(load,load<10?1:0)}%</b> встановленої потужності</span><span>з <b class="num">${nf(T.cap/1000,1)} МВт</b></span></div></div>
+      </div>
+      <div class="curve">
+        <div class="chead"><h3>Виробіток парку сьогодні</h3><span class="s">кВт · сума всіх станцій · 00:00–24:00</span></div>
+        <div class="ch"><canvas id="heroCh"></canvas></div>
+      </div>
+    </section>
+
+    <section class="kpis c5 mt">
+      <div class="kpi accent"><div class="k">Енергія сьогодні</div><div class="v num">${eHtml(T.pvD)}</div><div class="s"><b class="num">${money(T.revD)}</b> дохід</div></div>
+      <div class="kpi"><div class="k">Цей місяць</div><div class="v num">${eHtml(T.pvM)}</div><div class="s"><b class="num">${money(T.revM)}</b> дохід</div></div>
+      <div class="kpi"><div class="k">Цей рік</div><div class="v num">${eHtml(T.pvY)}</div><div class="s"><b class="num">${money(T.revY)}</b> дохід</div></div>
+      <div class="kpi"><div class="k">За весь час</div><div class="v num">${eHtml(T.pvL)}</div><div class="s"><b class="num">${money(T.revL)}</b> дохід</div></div>
+      <div class="kpi"><div class="k">Станцій онлайн</div><div class="v num">${online} / ${S.length}</div>
+        <div class="s">${probs.length?probs.length+' потребують уваги':'усі станції справні'}</div></div>
+    </section>
+
+    <div class="sh"><h2>Усі станції</h2><span class="c">генерація сьогодні наживо · наведіть на графік</span>
+      <div class="r"><span class="lgd"><i style="background:var(--ok)"></i>онлайн</span><span class="lgd"><i style="background:var(--warn)"></i>попередження</span><span class="lgd"><i style="background:var(--off)"></i>офлайн</span></div></div>
+    <div class="grid">${order.map(o=>scard(o.s,o.i)).join('')}</div>
+
+    <div class="duo">
+      <section class="card pn"><div class="chead"><h3>Питомий виробіток сьогодні</h3><span class="s">кВт·год на 1 кВт потужності — порівнює станції різного розміру</span></div>${rankHtml}</section>
+      <section class="card pn"><div class="chead"><h3>Внесок станцій сьогодні</h3><span class="s num">${eTxt(T.pvD)} разом</span></div>${shareHtml}</section>
+    </div>
+
+    <div class="sh"><h2>Генерація за період</h2><span class="c">${R.title}</span></div>
+    ${rangeBar()}
+    <section class="card pn">
+      <div class="sum">
+        <div><div class="k">Разом</div><div class="v num">${eTxt(pTot)}</div></div>
+        <div><div class="k">Дохід</div><div class="v num money">${money(pRev)}</div></div>
+        <div><div class="k">У середньому за ${unitWord(R.gran)}</div><div class="v num">${allL.length?eTxt(pTot/allL.length):'—'}</div></div>
+      </div>
+      <div class="ch tall"><canvas id="oGen"></canvas></div>
+    </section>
+
+    ${pricesPanel()}`;
+
+  line24('heroCh',[{l:'Парк',d:fleet,c:C.pv}]);
+  const sets=per.map(p=>{const m=Object.fromEntries(p.a.data.map(d=>[d.label,d.pv]));return {l:short(nm(p.s)),d:allL.map(x=>m[x]??0),c:SC[p.i]};});
+  if(allL.length)bars('oGen',allL.map(x=>lbl(x,R.gran)),sets,'кВт·год',true);else noData('oGen','Немає даних за цей період');
+}
+
+function scard(s,i){
+  const v=stv(s),pv=pvToday(s),pct=s.nominal_kw>0?(s.now_kw||0)/s.nominal_kw*100:null;
+  const month=((s.monthly||[]).find(x=>x.label===TODAY.slice(0,7))||{}).pv||0;
+  return `<article class="card sc" style="border-top-color:${v[2]}" role="button" tabindex="0" onclick="go(${i})" onkeydown="if(event.key==='Enter')go(${i})">
+    <div class="sc-h"><span class="nm">${esc(nm(s))} <span>· ${cap(s)}</span></span><span class="badge" style="background:${v[2]}">${v[1]}</span></div>
+    <div class="sc-m"><div class="pw"><b class="num">${kw(s.now_kw||0)}</b><u>кВт зараз</u></div>
+      <div class="ld">${pct!=null?`<b class="num">${nf(pct,0)}%</b> потужності`:''}</div></div>
+    <div class="spark">${spark(s,i)}</div>
+    <div class="sc-f">
+      <div><div class="k">Сьогодні</div><div class="v num">${eHtml(pv)}</div></div>
+      <div><div class="k">Цей місяць</div><div class="v num">${eHtml(month)}</div></div>
+      <div><div class="k">Дохід сьогодні</div><div class="v num money">${money(incomeOf(s,pv,tRev(s)))}</div></div>
+    </div></article>`;
+}
+
+/* ---------- tariffs (shared via GitHub) ---------- */
+function pricesPanel(){
+  const rows=S.map((s,i)=>{const pr=s.pr,eff=(pr.custom&&pr.eur)?pr.eur:pr.def_eur,disp=(s.display&&s.display!==s.name)?s.display:'';
+    return `<tr><td class="id">${esc(s.name)}</td>
+      <td><input id="pnm${i}" type="text" maxlength="40" placeholder="${esc(s.name)}" value="${esc(disp)}"></td>
+      <td><input id="pe${i}" type="number" min="0" step="1" inputmode="decimal" oninput="recalcUah(${i})" placeholder="${nf(pr.def_eur,0)}" value="${pr.custom&&pr.eur?pr.eur:''}"></td>
+      <td class="num"><span id="pu${i}">${nf(Math.round((eff||0)*FX),0)}</span> ₴</td></tr>`;}).join('');
+  return `<details class="card prices" ${PRICES_OPEN?'open':''} ontoggle="PRICES_OPEN=this.open">
+    <summary>Налаштування станцій<span class="s">назви та тарифи, €/МВт·год</span><span class="chev">${ICON.down}</span></summary>
+    <div class="pbody">
+      <div class="prow">Курс, ₴ за 1 €<input id="fxin" type="number" min="0" step="0.1" inputmode="decimal" oninput="recalcAllUah()" value="${FX}"></div>
+      <div style="overflow-x:auto"><table class="ptbl"><thead><tr><th class="id">Ідентифікатор</th><th>Назва</th><th>Ціна, €/МВт·год</th><th>У гривні</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="pacts"><button class="btn pri" onclick="applyPrices()">Переглянути зміни</button><button class="btn" onclick="savePrices()">Зберегти для всіх</button><button class="btn" onclick="resetPrices()">Скинути</button></div>
+      <div class="phint">Назва — як станція показується всюди (порожньо = ідентифікатор). Ціна задається лише в €/МВт·год, гривня рахується як € × курс.
+        «Переглянути зміни» діє тільки у вашому браузері. «Зберегти для всіх» відкриє GitHub — після підтвердження ціни збережуться для всіх, панель оновиться за 1–2 хвилини.</div>
+    </div></details>`;
+}
+function recalcUah(i){const fx=parseFloat((document.getElementById('fxin')||{}).value)||FX,e=parseFloat((document.getElementById('pe'+i)||{}).value);
+  const eff=e>0?e:S[i].pr.def_eur,el=document.getElementById('pu'+i);if(el)el.textContent=nf(Math.round((eff||0)*fx),0);}
+function recalcAllUah(){S.forEach((s,i)=>recalcUah(i));}
+function applyPrices(){const fx=parseFloat((document.getElementById('fxin')||{}).value);if(fx>0)FX=fx;
+  S.forEach((s,i)=>{const e=parseFloat((document.getElementById('pe'+i)||{}).value);s.pr.custom=e>0;s.pr.eur=e>0?e:null;
+    const dn=((document.getElementById('pnm'+i)||{}).value||'').trim();s.display=dn||s.name;});
+  PRICES_OPEN=true;updateFx();renderNav(curView);rerender();}
+function resetPrices(){S.forEach(s=>{s.pr.custom=false;s.pr.eur=null;s.display=s.name;});PRICES_OPEN=true;renderNav(curView);rerender();}
+function savePrices(){
+  const fx=parseFloat((document.getElementById('fxin')||{}).value)||FX,stations={},names={};
+  S.forEach((s,i)=>{const e=parseFloat((document.getElementById('pe'+i)||{}).value);if(e>0)stations[s.name]={eur_mwh:e};
+    const dn=((document.getElementById('pnm'+i)||{}).value||'').trim();if(dn&&dn!==s.name)names[s.name]=dn;});
+  const body='Збереження тарифів для всіх станцій. Бот застосує автоматично — **не редагуйте** JSON нижче вручну.\n\n```json\n'+JSON.stringify({uah_per_eur:fx,stations,names},null,2)+'\n```\n\nПісля натискання «Submit new issue» ціни збережуться і дашборд оновиться за ~2 хв.';
+  window.open('https://github.com/'+REPO+'/issues/new?labels=price&title='+encodeURIComponent('Оновлення тарифів станцій')+'&body='+encodeURIComponent(body),'_blank','noopener');
+}
+
+/* ---------- STATION ---------- */
+function stHead(s){
+  const v=stv(s),map=(s.lat&&s.lon)?`https://www.google.com/maps?q=${s.lat},${s.lon}`:null;
+  return `<button class="back" onclick="go(-1)">${ICON.left}Усі станції</button>
+    <div class="sthead"><div><h1>${esc(nm(s))}<span class="badge" style="background:${v[2]}">${v[1]}</span></h1>
+      <div class="meta"><span><b class="num">${cap(s)}</b> встановлено</span>${s.address?`<span>${ICON.pin}${esc(s.address)}</span>`:''}</div></div>
+      <div class="tags">
+        ${s.source==='neteco'?'<span class="tag">Photomate NetEco</span>':s.source==='solarman'?'<span class="tag">Solarman</span>':'<span class="tag">FusionSolar</span>'}
+        ${s.metered?'<span class="tag">з лічильником</span>':''}
+        ${s.price&&s.price.purchase?`<span class="tag">Тариф: ${esc(s.price.purchase)}</span>`:''}
+        ${s.connected?`<span class="tag num">з ${esc(s.connected)}</span>`:''}
+        ${map?`<a class="tag" href="${map}" target="_blank" rel="noopener">${ICON.map}Карта</a>`:''}</div></div>`;
+}
+function alarmsBlock(s){
+  return `<div class="sh"><h2>Аварії</h2></div><section class="card alarms">${(s.alarms&&s.alarms.length)
+    ?s.alarms.map(a=>`<div class="al">${ICON.warn}<div><b style="font-weight:600">${esc(a.name)}</b>${a.device?`<div class="dv">${esc(a.device)}</div>`:''}</div></div>`).join('')
+    :`<div class="okrow">${ICON.check}Немає активних аварій</div>`}</section>`;
+}
+function stationLive(s){
+  const pct=s.nominal_kw?(s.now_kw||0)/s.nominal_kw*100:null;
+  document.getElementById('view').innerHTML=`${stHead(s)}
+    <section class="kpis c5">
+      <div class="kpi"><div class="k">Потужність зараз</div><div class="v num">${kw(s.now_kw||0)}<u>кВт</u></div><div class="s">${pct!=null?nf(pct,0)+'% потужності':''}</div></div>
+      <div class="kpi accent"><div class="k">Генерація сьогодні</div><div class="v num">${eHtml(s.today_kwh||0)}</div></div>
+      <div class="kpi"><div class="k">Встановлено</div><div class="v num">${nf(s.nominal_kw)}<u>кВт</u></div></div>
+      <div class="kpi"><div class="k">Вироблено всього</div><div class="v num">${eHtml(s.total_kwh||0)}</div></div>
+      <div class="kpi"><div class="k">Дохід за весь час</div><div class="v num money">${money(CUR==='₴'?(s.total_rev||0)*FX:(s.total_rev||0))}</div></div>
+    </section>
+    <div class="infonote">${ICON.info}<div>Для цієї станції доступні лише дані наживо та підсумки за весь час — детальної історії система не віддає.</div></div>
+    ${alarmsBlock(s)}`;
+}
+function station(i){
+  clearCharts();
+  const s=S[i];if(noHist(s))return stationLive(s);
+  const R=resolveRange(),a=agg(s,R),t=a.tot,td=s.today||{};
+  const curve=toGrid(s.today_curve,'kw'),P=peakOf(curve);
+  // meter-side curve; anything after "now" can't be today's data, so drop it
+  const ovPv=toGrid(s.today_overlap,'pv'),ovLoad=toGrid(s.today_overlap,'load');
+  if(NOWI!=null)for(let k=NOWI+1;k<288;k++){ovPv[k]=null;ovLoad[k]=null;}
+  const ov=!!s.metered&&ovLoad.some(v=>v!=null);
+  const showRev=hasRev(s)||(s.pr&&s.pr.custom);
+  const strip=cells=>{const c=cells.filter(Boolean);return `<section class="kpis ${c.length>5||c.length===4?'c4':c.length===5?'c5':'c3'}">${c.join('')}</section>`;};
+  const pv=pvToday(s),pInc=incomeOf(s,t.pv,t.rev);
+  const pct=s.nominal_kw?(s.now_kw||0)/s.nominal_kw*100:null,syt=s.nominal_kw?pv/s.nominal_kw:null;
+  const cell=(k,v,m,cls)=>`<div class="kpi ${cls&&cls!==1?cls:''}"><div class="k">${k}</div><div class="v num">${v}</div>${m?`<div class="s">${m}</div>`:''}</div>`;
+  const L=a.data.map(d=>lbl(d.label,R.gran));
+  document.getElementById('view').innerHTML=`${stHead(s)}
+    ${strip([
+      cell('Потужність зараз',kw(s.now_kw||0)+'<u>кВт</u>',pct!=null?nf(pct,pct<10?1:0)+'% встановленої':'',1),
+      cell('Пік сьогодні',P.i>=0?kw(P.pk)+'<u>кВт</u>':'—',P.i>=0?'о '+GRID[P.i]:'',1),
+      cell('Генерація сьогодні',eHtml(pv),syt!=null?nf(syt,2)+' кВт·год на 1 кВт':'','accent'),
+      showRev&&cell('Дохід сьогодні','<span class="money">'+money(incomeOf(s,pv,tRev(s)))+'</span>','')])}
+    ${s.metered?`<div class="sh tight"><h2>Енергобаланс сьогодні</h2><span class="c">за лічильником</span></div>
+    ${strip([
+      cell('Споживання',eHtml(td.load||0),''),
+      cell('Самоспоживання',td.self_cons!=null?nf(td.self_cons,0)+'<u>%</u>':'—','генерації спожито на місці',1),
+      cell('Самозабезпечення',td.self_suff!=null?nf(td.self_suff,0)+'<u>%</u>':'—','навантаження покрито ПВ',1),
+      cell('У мережу',eHtml(td.export||0),'надлишок',1),
+      cell('З мережі',eHtml(td.imp||0),'імпорт',1)])}`:''}
+
+    <section class="card pn mt">
+      <div class="chead"><h3>${ov?'Генерація і споживання сьогодні':'Потужність сьогодні'}</h3><span class="s">кВт · крок 5 хв · 00:00–24:00</span>
+        ${ov?`<label class="tog"><input type="checkbox" checked onchange="toggleLoad(this.checked)">споживання</label>`:''}</div>
+      <div class="ch tall"><canvas id="dCurve"></canvas></div>
+    </section>
+
+    <div class="sh"><h2>Аналіз за період</h2><span class="c">${R.title}</span></div>
+    ${rangeBar()}
+    ${strip([
+      cell('Генерація ПВ',eHtml(t.pv||0),L.length?'у середньому <b style="color:var(--ink)">'+eTxt((t.pv||0)/L.length)+'</b> за '+unitWord(R.gran):'','accent'),
+      s.metered&&cell('Спожито',eHtml(t.load||0),''),
+      s.metered&&cell('Самоспожито',eHtml(t.selfuse||0),t.pv?nf(t.selfuse/t.pv*100,0)+'% генерації':'',1),
+      s.metered&&cell('Віддано в мережу',eHtml(t.export||0),''),
+      s.metered&&cell('Куплено з мережі',eHtml(t.imp||0),''),
+      s.metered&&cell('Самозабезпечення',t.load?nf(t.selfuse/t.load*100,0)+'<u>%</u>':'—',''),
+      showRev?cell('Дохід','<span class="money">'+money(pInc)+'</span>',R.title,1):cell('Пристроїв',s.n_inverters||s.device_num||'—',''),
+      showRev&&cell('Середня ціна',t.pv?money(pInc/(t.pv/1000)):'—',(s.pr&&s.pr.custom)?'за МВт·год · ваша ціна':'за МВт·год',1)])}
+    ${!s.metered?`<div class="infonote">${ICON.info}<div>На цій станції немає лічильника споживання, тож навантаження, імпорт і експорт у мережу недоступні. Показано генерацію та дохід.</div></div>`:''}
+    <div class="cgrid">
+      <section class="card pn full"><div class="chead"><h3>${s.metered?'Генерація і споживання':'Генерація ПВ'}</h3><span class="s">кВт·год · ${R.title}</span></div><div class="ch md"><canvas id="dGenLoad"></canvas></div></section>
+      ${s.metered?`<section class="card pn"><div class="chead"><h3>Обмін з мережею</h3><span class="s">імпорт і експорт, кВт·год</span></div><div class="ch md"><canvas id="dGrid"></canvas></div></section>`:''}
+      ${showRev?`<section class="card pn ${s.metered?'':'full'}"><div class="chead"><h3>Дохід</h3><span class="s">${CUR} · ${R.title}</span></div><div class="ch md"><canvas id="dRev"></canvas></div></section>`:''}
+      ${s.metered?`<section class="card pn"><div class="chead"><h3>Куди пішла генерація</h3></div><div class="ch sm"><canvas id="dDoGen"></canvas></div></section>
+        <section class="card pn"><div class="chead"><h3>Звідки спожито</h3></div><div class="ch sm"><canvas id="dDoUse"></canvas></div></section>`:''}
+    </div>
+    ${alarmsBlock(s)}`;
+
+  if(ov)line24('dCurve',[{l:'Генерація ПВ',d:ovPv.some(v=>v!=null)?ovPv:curve,c:C.pv},{l:'Споживання',d:ovLoad,c:C.load}]);
+  else if(curve.some(v=>v!=null))line24('dCurve',[{l:'Потужність',d:curve,c:stv(s)[2]==='#94a3b8'?'#94a3b8':C.pv}]);
+  else noData('dCurve','Немає даних за сьогодні — станція не на зв’язку');
+  if(!L.length){noData('dGenLoad','Немає даних за цей період');}
+  else{
+    bars('dGenLoad',L,s.metered?[{l:'Генерація ПВ',d:a.data.map(d=>d.pv),c:C.pv},{l:'Споживання',d:a.data.map(d=>d.load),c:C.load}]:[{l:'Генерація ПВ',d:a.data.map(d=>d.pv),c:C.pv}],'кВт·год');
+    if(s.metered)bars('dGrid',L,[{l:'З мережі',d:a.data.map(d=>d.imp),c:C.imp},{l:'У мережу',d:a.data.map(d=>d.export),c:C.export}],'кВт·год');
+    if(showRev)bars('dRev',L,[{l:'Дохід',d:a.data.map(d=>incomeOf(s,d.pv,d.rev)),c:C.rev}],'money');
+  }
+  if(s.metered){
+    donut('dDoGen',['Самоспоживання','Експорт у мережу'],[t.selfuse||0,t.export||0],[C.selfuse,C.export],'кВт·год');
+    donut('dDoUse',['Від ПВ','З мережі'],[t.selfuse||0,t.imp||0],[C.selfuse,C.imp],'кВт·год');
+  }
+}
+function toggleLoad(show){const ch=charts.find(c=>c.canvas&&c.canvas.id==='dCurve');if(ch&&ch.data.datasets[1]){ch.setDatasetVisibility(1,show);ch.update();}}
+
+/* ---------- nav / boot ---------- */
+function renderNav(a){
+  document.getElementById('nav').innerHTML=[`<button class="tab ${a<0?'on':''}" onclick="go(-1)">Огляд</button>`,
+    ...S.map((s,i)=>`<button class="tab ${a===i?'on':''}" onclick="go(${i})"><i style="background:${stv(s)[0]}"></i>${esc(short(nm(s)))}</button>`)].join('');
+}
+function render(){curView<0?overview():station(curView);}
+function go(i){curView=i;renderNav(i);window.scrollTo({top:0});render();}
+function rerender(){const y=window.scrollY;render();window.scrollTo({top:y});}
+function setCur(c){if(c===CUR)return;CUR=c;document.querySelectorAll('#curtog button').forEach(b=>b.classList.toggle('on',b.dataset.c===c));rerender();}
+function updateFx(){document.getElementById('fxnote').textContent='1 € = '+nf(FX,FX%1?2:0)+' ₴';}
+function boot(d){
+  DATA=d;S=d.stations;TODAY=d.updated.slice(0,10);FX=+d.fx||42;REPO=d.repo||REPO;
+  S.forEach(s=>{s.pr=s.pr||{custom:false,eur:null,def_eur:0};
+    ['daily','monthly','yearly'].forEach(k=>Array.isArray(s[k])&&s[k].sort((a,b)=>String(a.label).localeCompare(String(b.label))));
+    if(s.address)s.address=s.address.replace(/\(?null\)?/g,' ').replace(/\s+/g,' ').trim();});
+  SC=[];S.map((s,i)=>i).sort((a,b)=>(+S[b].nominal_kw||0)-(+S[a].nominal_kw||0)||a-b).forEach((i,r)=>SC[i]=COLORS[r%COLORS.length]);
+  NOWI=slotOf(d.updated);if(NOWI<0)NOWI=null;
+  markFresh();
+  document.getElementById('foot').innerHTML=`Автоматично з FusionSolar, Photomate і Solarman · <span class="num">${esc(d.updated)}</span> (${esc(d.tz||'Europe/Kyiv')}) · оновлюється кожні 5 хв${PW?' · <a href="#" onclick="logout();return false">Вийти</a>':''}`;
+  updateFx();renderNav(curView);render();
+}
+function markFresh(){
+  if(!DATA)return;
+  const age=(Date.now()-new Date(DATA.updated.replace(' ','T')).getTime())/6e4;
+  const upd=document.getElementById('upd');upd.className='live'+(age>30?' stale':'');
+  upd.innerHTML=`<i></i>${age>30?'Оновлено':'Наживо ·'} <span class="num">${DATA.updated.slice(11,16)}</span>`;
+  upd.title=age>30?'Дані старші за 30 хвилин':'Дані актуальні';
+}
+
+/* ---------- live data: password-gated Worker endpoint ---------- */
+const API='https://brenvel-solar-bot.sonnen-shop.workers.dev/data';
+const PWKEY='brenvel_pw';
+let PW=null,lastFetch=0,liveT=null;
+const store=(o,k,v)=>{try{if(v===undefined)return o.getItem(k);if(v==null)o.removeItem(k);else o.setItem(k,v);}catch(e){return null;}};
+async function fetchData(pw){
+  const r=await fetch(API+'?t='+Date.now(),{headers:{'x-pw':pw},cache:'no-store'});
+  if(r.status===401){const e=new Error('auth');e.auth=true;throw e;}
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const d=await r.json();lastFetch=Date.now();return d;
+}
+function showGate(msg){document.getElementById('gate').hidden=false;document.getElementById('gerr').textContent=msg||'';
+  setTimeout(()=>document.getElementById('gpw').focus(),0);}
+async function login(e){
+  e.preventDefault();
+  const pw=document.getElementById('gpw').value.trim(),btn=document.getElementById('gbtn');if(!pw)return;
+  btn.disabled=true;btn.textContent='Перевіряю…';document.getElementById('gerr').textContent='';
+  try{
+    const d=await fetchData(pw);PW=pw;
+    store(localStorage,PWKEY,document.getElementById('grem').checked?pw:null);store(sessionStorage,PWKEY,pw);
+    document.getElementById('gate').hidden=true;boot(d);startLive();
+  }catch(err){
+    document.getElementById('gerr').textContent=err.auth?'Невірний пароль':'Не вдалося завантажити дані. Перевірте інтернет і спробуйте ще раз.';
+  }finally{btn.disabled=false;btn.textContent='Переглянути панель';}
+}
+function logout(){store(localStorage,PWKEY,null);store(sessionStorage,PWKEY,null);location.reload();}
+async function refresh(){
+  if(!PW||PRICES_OPEN)return;            // don't wipe tariffs someone is editing
+  try{const d=await fetchData(PW);
+    if(!DATA||d.updated!==DATA.updated){const y=window.scrollY;boot(d);window.scrollTo({top:y});}else markFresh();
+  }catch(err){if(err.auth)logout();}
+}
+function startLive(){
+  if(liveT)return;
+  liveT=setInterval(refresh,5*60*1000);
+  setInterval(markFresh,60*1000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-lastFetch>2*60*1000)refresh();});
+}
+(async function start(){
+  /*__PRELOAD__*/
+  if(window.PRELOAD){boot(window.PRELOAD);return;}   // local design preview only
+  PW=store(localStorage,PWKEY)||store(sessionStorage,PWKEY);
+  if(!PW){showGate();return;}
+  try{boot(await fetchData(PW));startLive();}
+  catch(err){
+    if(err.auth){store(localStorage,PWKEY,null);store(sessionStorage,PWKEY,null);PW=null;showGate();}
+    else document.getElementById('view').innerHTML='<div class="loading">Не вдалося завантажити дані.<button class="btn" onclick="location.reload()">Спробувати ще раз</button></div>';
+  }
+})();
+</script>
+</body>
+</html>

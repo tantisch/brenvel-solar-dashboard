@@ -121,6 +121,10 @@ const CORS = {
   "access-control-allow-methods": "GET, OPTIONS",
 };
 
+// decrypted bundle kept per isolate: CI republishes every ~5 min, so a 60 s
+// cache costs nothing in freshness and saves a GitHub fetch + PBKDF2 per view
+let _full = { at: 0, json: null };
+
 async function dataEndpoint(request, env) {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
   const u = new URL(request.url);
@@ -128,15 +132,22 @@ async function dataEndpoint(request, env) {
   if (pw !== env.DATA_KEY) {
     return new Response("unauthorized", { status: 401, headers: CORS });
   }
+  const ok = (json) => new Response(json, { headers: { ...CORS,
+    "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+  const now = Date.now();
+  if (_full.json && now - _full.at < 60000) return ok(_full.json);
   try {
-    const r = await fetch(env.FULL_DATA_URL + "?t=" + Date.now(),
-      { cf: { cacheTtl: 0 }, headers: { "cache-control": "no-cache" } });
-    if (!r.ok) return new Response("data unavailable", { status: 502, headers: CORS });
+    const r = await fetch(env.FULL_DATA_URL + "?t=" + now, {
+      cf: { cacheTtl: 0 }, headers: { "cache-control": "no-cache" },
+      signal: AbortSignal.timeout(12000) });
+    if (!r.ok) throw new Error("upstream " + r.status);
     const json = await decrypt((await r.text()).trim(), env.DATA_KEY);
-    return new Response(json, { headers: { ...CORS, "content-type": "application/json; charset=utf-8" } });
+    _full = { at: now, json };
+    return ok(json);
   } catch (e) {
     console.log("dataEndpoint error:", e);
-    return new Response("error", { status: 500, headers: CORS });
+    if (_full.json) return ok(_full.json);          // last good copy beats an error
+    return new Response("data unavailable", { status: 502, headers: CORS });
   }
 }
 
