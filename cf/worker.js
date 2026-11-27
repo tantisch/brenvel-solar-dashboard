@@ -59,7 +59,8 @@ async function handleUpdate(update, env) {
   const text = ((msg.text || msg.caption || "") + "").trim();
 
   const subs = await getJSON(env, "subscribers", []);
-  if (!subs.includes(chatId)) {
+  const owners = (env.OWNER_CHATS || "").split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
+  if (!subs.includes(chatId) && !owners.includes(chatId)) {
     const pw = (env.BOT_PASSWORD || "").trim();
     if (pw && text === pw) {
       subs.push(chatId);
@@ -126,9 +127,10 @@ async function decrypt(b64, password) {
 
 // ---- helpers --------------------------------------------------------------
 async function getJSON(env, key, dflt) {
-  const raw = await env.SOLAR_STATE.get(key);
-  if (!raw) return dflt;
-  try { return JSON.parse(raw); } catch { return dflt; }
+  try {
+    const raw = await env.SOLAR_STATE.get(key);
+    return raw ? JSON.parse(raw) : dflt;
+  } catch { return dflt; }
 }
 
 async function send(env, chatId, text) {
