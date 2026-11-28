@@ -10,6 +10,11 @@ on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
+    inputs:
+      window:
+        description: "Loop window in seconds (default ~5h; small values test the hand-over)"
+        required: false
+        default: "18000"
   repository_dispatch:
     types: [refresh]
   push:
@@ -52,9 +57,12 @@ jobs:
           REPORT_HOUR: ${{ vars.REPORT_HOUR || '21' }}
           GH_TOKEN: ${{ github.token }}
           REPO_SLUG: ${{ github.repository }}
+          LOOP_WINDOW: ${{ inputs.window || '18000' }}
         run: |
           REPO="https://x-access-token:${GH_TOKEN}@github.com/${REPO_SLUG}.git"
-          END=$(( $(date +%s) + 18000 ))   # loop for ~5h, then exit (gets restarted)
+          W="${LOOP_WINDOW:-18000}"; case "$W" in ''|*[!0-9]*) W=18000;; esac
+          [ "$W" -gt 18000 ] && W=18000   # stay under the 6h job cap
+          END=$(( $(date +%s) + W ))      # loop for ~5h, then hand over to a new run
           n=0
           while [ "$(date +%s)" -lt "$END" ]; do
             START=$(date +%s); n=$((n+1))
@@ -132,5 +140,12 @@ jobs:
           # 28.11). workflow_dispatch via GITHUB_TOKEN does start a new run; the
           # concurrency group then retires this one. Cron stays as a fallback.
           echo "loop window elapsed; dispatching the next run"
-          gh workflow run dashboard.yml --ref main -R "$REPO_SLUG" \
-            || echo "self-dispatch failed; the schedule will restart the loop"
+          # Public repos auto-disable workflows after 60 days without repo
+          # activity, and a disabled workflow refuses dispatch. Re-enabling is a
+          # no-op when it is already enabled.
+          gh workflow enable dashboard.yml -R "$REPO_SLUG" 2>/dev/null || true
+          for i in 1 2 3 4 5; do
+            gh workflow run dashboard.yml --ref main -R "$REPO_SLUG" && exit 0
+            echo "self-dispatch attempt $i failed; retrying"; sleep 30
+          done
+          echo "self-dispatch failed; the schedule will restart the loop"
