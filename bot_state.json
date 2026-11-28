@@ -1,0 +1,56 @@
+{
+ "activated": true,
+ "last_daily": "2026-11-27",
+ "stations": {
+  "Brenvei_K.K_navis": {
+   "fault": false,
+   "since": null,
+   "status": "connected"
+  },
+  "Brenvel_K.K_balast": {
+   "fault": false,
+   "since": null,
+   "status": "connected"
+  },
+  "Brenvel_Kovel": {
+   "fault": false,
+   "since": null,
+   "status": "connected"
+  },
+  "Brenvel_Turiisk": {
+   "fault": false,
+   "since": null,
+   "status": "connected"
+  },
+  "Brenvel_Zhytomyr": {
+   "fault": false,
+   "since": null,
+   "status": "disconnected"
+  },
+  "Жорнава": {
+   "fault": false,
+   "since": null,
+   "status": "trouble"
+  },
+  "Кролевець": {
+   "fault": false,
+   "since": null,
+   "status": "trouble"
+  },
+  "СЕС Ковель MK": {
+   "fault": false,
+   "since": null,
+   "status": "disconnected"
+  },
+  "СЕС Овруч": {
+   "fault": true,
+   "since": "2026-11-26T13:51:25+02:00",
+   "status": "disconnected"
+  }
+ },
+ "subscribers": [
+  88611341,
+  1081188172
+ ],
+ "update_offset": 380975798
+}
