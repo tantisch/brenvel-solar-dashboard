@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: write          # push the built site to the gh-pages branch
+  actions: write           # the loop re-dispatches itself when its window ends
 
 concurrency:
   group: solar-dashboard
@@ -35,7 +36,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Build, encrypt and publish every ~15 minutes
+      - name: Build, encrypt and publish every ~5 minutes
         env:
           FUSIONSOLAR_USER: ${{ secrets.FUSIONSOLAR_USER }}
           FUSIONSOLAR_PASSWORD: ${{ secrets.FUSIONSOLAR_PASSWORD }}
@@ -126,4 +127,10 @@ jobs:
             EL=$(( $(date +%s) - START )); S=$(( 300 - EL )); [ "$S" -lt 20 ] && S=20
             echo "next cycle in ${S}s"; sleep "$S"
           done
-          echo "loop window elapsed; exiting (schedule/dispatch will restart it)"
+          # Hand over to a fresh run right away. The cron alone is not enough:
+          # GitHub delays/drops it for hours (the page sat stale 09:38→13:20Z on
+          # 28.11). workflow_dispatch via GITHUB_TOKEN does start a new run; the
+          # concurrency group then retires this one. Cron stays as a fallback.
+          echo "loop window elapsed; dispatching the next run"
+          gh workflow run dashboard.yml --ref main -R "$REPO_SLUG" \
+            || echo "self-dispatch failed; the schedule will restart the loop"
